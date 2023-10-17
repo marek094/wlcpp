@@ -1,0 +1,1 @@
+( mkdir -p build; cd build; cmake -DCMAKE_BUILD_TYPE=Release ..; cmake --build .) && time ./build/src/wlcpp graph_data/graph6c.g6 
