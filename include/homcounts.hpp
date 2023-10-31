@@ -86,6 +86,24 @@ auto compute_pathwidth_one_homvec_v2(SmallGraph graph, SmallGraph::type num_vert
     return homvector;
 }
 
+auto compute_path_homvec(SmallGraph graph, SmallGraph::type num_vertices) -> std::vector<unsigned long long> {
+    auto A = graph.to_adjacency_matrix();
+
+    using eigen_matrix_t = decltype(A);
+
+    std::vector<unsigned long long> homvector;
+    homvector.reserve(num_vertices+1);
+    
+    eigen_matrix_t product = eigen_matrix_t::Identity(A.rows(), A.cols());
+    homvector.push_back(product.sum());
+    for (int n = 0; n < num_vertices; ++n) {
+        product = product * A;
+        homvector.push_back(product.sum());
+    }
+
+    return homvector;
+}
+
 
 
 } // namespace wl

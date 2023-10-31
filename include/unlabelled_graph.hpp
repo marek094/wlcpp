@@ -97,6 +97,37 @@ public:
         }
     }
 
+    auto print_python() const -> void {
+        std::cout << "nx.from_edgelist([";
+        for (auto &&[u, v] : edges) {
+            std::cout << "(" 
+                << static_cast<int>(u) << ", " 
+                << static_cast<int>(v) << "), ";
+        }
+        std::cout << "])\n";
+    }
+
+    auto print_as_txt_line(std::ostream& os) const -> void {
+        assert(labels.empty());
+        int n = this->number_of_vertices();
+        int m = edges.size();
+        int has_labels = false;
+        os << n << " " << m << " " << has_labels << " ";
+        for (auto &&[u, v] : edges) {
+            os << static_cast<int>(u) << " " << static_cast<int>(v) << " ";
+        }
+        os << "\n";
+    }
+
+    auto degree_vector() const -> std::vector<unsigned long long> {
+        auto degrees = std::vector<unsigned long long>(this->number_of_vertices(), 0);
+        for (auto &&[u, v] : edges) {
+            degrees[u] += 1;
+            degrees[v] += 1;
+        }
+        return degrees;
+    }
+
     using type = vertex_t;
     std::vector<unsigned long long> labels;
     unsigned long long num_vertices;

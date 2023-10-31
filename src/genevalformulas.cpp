@@ -83,7 +83,7 @@ struct logic_quantifier_modulo_t {
     bool is_E;
 
     auto static forall_mod() -> generator<int> {
-        constexpr auto kMaxMod = 4ULL;
+        constexpr auto kMaxMod = 1ULL;
         for (auto i = 1ULL; i <= kMaxMod; ++i) {
             co_yield static_cast<int>(1ULL << i);
         }
@@ -237,9 +237,9 @@ struct logic_quantifier_bincount_t {
 
 
 // using logic_formula_t = std::vector<logic_quantifier_bound_t>;
-// using logic_formula_t = std::vector<logic_quantifier_modulo_t>;
+using logic_formula_t = std::vector<logic_quantifier_modulo_t>;
 // using logic_formula_t = std::vector<logic_quantifier_bincount_t>;
-using logic_formula_t = std::vector<logic_quantifier_binmod_t>;
+// using logic_formula_t = std::vector<logic_quantifier_binmod_t>;
 
 
 auto operator<< (std::ostream& os, logic_formula_t const& formula) -> std::ostream& {
