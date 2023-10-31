@@ -65,20 +65,181 @@ struct logic_quantifier_bound_t {
         return std::move(os.str());
     }
 
-    // print me as << "E()"
     friend auto operator<<(std::ostream& os, logic_quantifier_bound_t const& step) -> std::ostream& {
         os << step.to_string();
         return os;
+    }
+
+    friend auto hash_struct(logic_quantifier_bound_t const& tuple) -> size_t {
+        return std::hash<int>()(tuple.count) ^ std::hash<bool>()(tuple.is_E);
     }
 
     auto operator==(logic_quantifier_bound_t const& other) const -> bool = default;
     auto operator<=>(logic_quantifier_bound_t const& other) const -> std::strong_ordering = default;
 };
 
+struct logic_quantifier_modulo_t {
+    int mod;
+    bool is_E;
+
+    auto static forall_mod() -> generator<int> {
+        constexpr auto kMaxMod = 4ULL;
+        for (auto i = 1ULL; i <= kMaxMod; ++i) {
+            co_yield static_cast<int>(1ULL << i);
+        }
+    }
+
+    auto static forall_is_E() -> generator<bool> {
+        co_yield true;
+        // co_yield false;
+    }
+
+    auto static forall() -> generator<logic_quantifier_modulo_t> {
+        for (auto &&mod : forall_mod()) {
+            for (auto &&is_E : forall_is_E()) {
+                co_yield logic_quantifier_modulo_t{.mod = mod, .is_E = is_E};
+            }
+        }
+    }
+
+    auto to_string(std::string var1 = "x", std::string var2 = "y") const -> std::string {
+        std::stringstream os;
+        os << "(E%" << this->mod << var1 << ")";
+        
+        if (this->is_E) {
+            os << "A" << var2 << var1;
+        } else {
+            os << "~A" << var2 << var1;
+        }
+        return std::move(os.str());
+    }
+
+    friend auto operator<<(std::ostream& os, logic_quantifier_modulo_t const& step) -> std::ostream& {
+        os << step.to_string();
+        return os;
+    }
+    
+
+    friend auto hash_struct(logic_quantifier_modulo_t const& tuple) -> size_t {
+        return std::hash<uintmax_t>()(tuple.mod) ^ std::hash<bool>()(tuple.is_E);
+    }
+
+    auto operator==(logic_quantifier_modulo_t const& other) const -> bool = default;
+    auto operator<=>(logic_quantifier_modulo_t const& other) const -> std::strong_ordering = default;
+};
+
+
+struct logic_quantifier_binmod_t {
+    bool modulo_is_one;
+    bool is_E;
+
+    auto static forall_modulo_is_one() -> generator<bool> {
+        co_yield true;
+        co_yield false;
+    }
+
+    auto static forall_is_E() -> generator<bool> {
+        co_yield true;
+        // co_yield false;
+    }
+
+    auto static forall() -> generator<logic_quantifier_binmod_t> {
+        for (auto &&modulo_is_one : forall_modulo_is_one()) {
+            for (auto &&is_E : forall_is_E()) {
+                co_yield logic_quantifier_binmod_t{.modulo_is_one = modulo_is_one, .is_E = is_E};
+            }
+        }
+    }
+
+    auto to_string(std::string var1 = "x", std::string var2 = "y") const -> std::string {
+        std::stringstream os;
+        if (this->modulo_is_one) {
+            os << "(E%" << var1 << ")";
+        } else {
+            os << "(E~%" << var1 << ")";
+        }
+        
+        if (this->is_E) {
+            os << "A" << var2 << var1;
+        } else {
+            os << "~A" << var2 << var1;
+        }
+        return std::move(os.str());
+    }
+
+    friend auto operator<<(std::ostream& os, logic_quantifier_binmod_t const& step) -> std::ostream& {
+        os << step.to_string();
+        return os;
+    }
+
+    friend auto hash_struct(logic_quantifier_binmod_t const& tuple) -> size_t {
+        return std::hash<bool>()(tuple.modulo_is_one) ^ std::hash<bool>()(tuple.is_E);
+    }
+
+    auto operator==(logic_quantifier_binmod_t const& other) const -> bool = default;
+    auto operator<=>(logic_quantifier_binmod_t const& other) const -> std::strong_ordering = default;
+};
 
 
 
-using logic_formula_t = std::vector<logic_quantifier_bound_t>;
+struct logic_quantifier_bincount_t {
+    bool is_digit_not_carry;
+    bool is_E;
+
+    auto static forall_is_digit_not_carry() -> generator<bool> {
+        co_yield true;
+        co_yield false;
+    }
+
+    auto static forall_is_E() -> generator<bool> {
+        co_yield true;
+        // co_yield false;
+    }
+
+    auto static forall() -> generator<logic_quantifier_bincount_t> {
+        for (auto &&is_digit_not_carry : forall_is_digit_not_carry()) {
+            for (auto &&is_E : forall_is_E()) {
+                co_yield logic_quantifier_bincount_t{.is_digit_not_carry = is_digit_not_carry, .is_E = is_E};
+            }
+        }
+    }
+
+    auto to_string(std::string var1 = "x", std::string var2 = "y") const -> std::string {
+        std::stringstream os;
+        if (this->is_digit_not_carry) {
+            os << "(E&" << var1 << ")";
+        } else {
+            os << "(E^" << var1 << ")";
+        }
+        
+        if (this->is_E) {
+            os << "A" << var2 << var1;
+        } else {
+            os << "~A" << var2 << var1;
+        }
+        return std::move(os.str());
+    }
+
+    friend auto operator<<(std::ostream& os, logic_quantifier_bincount_t const& step) -> std::ostream& {
+        os << step.to_string();
+        return os;
+    }
+
+    friend auto hash_struct(logic_quantifier_bincount_t const& tuple) -> size_t {
+        return std::hash<bool>()(tuple.is_digit_not_carry) ^ std::hash<bool>()(tuple.is_E);
+    }
+
+    auto operator==(logic_quantifier_bincount_t const& other) const -> bool = default;
+    auto operator<=>(logic_quantifier_bincount_t const& other) const -> std::strong_ordering = default;
+};
+
+
+
+
+// using logic_formula_t = std::vector<logic_quantifier_bound_t>;
+// using logic_formula_t = std::vector<logic_quantifier_modulo_t>;
+// using logic_formula_t = std::vector<logic_quantifier_bincount_t>;
+using logic_formula_t = std::vector<logic_quantifier_binmod_t>;
 
 
 auto operator<< (std::ostream& os, logic_formula_t const& formula) -> std::ostream& {
@@ -115,8 +276,7 @@ struct component<logic_formula_t> {
     component(logic_formula_t const& value) : value(value) {}
     auto operator,(uintmax_t n) const -> uintmax_t {
         for (auto &&step : value) {
-            n ^= std::hash<int>()(step.count);
-            n ^= std::hash<bool>()(step.is_E);
+            n ^= hash_struct(step);
             n ^= n << (sizeof(uintmax_t) * 4 - 1);
         }
         return n ^ std::hash<uintmax_t>()(n);
@@ -142,6 +302,114 @@ public:
 
     EvaluatorLogicPaths(wl::SmallGraph const& graph) : graph(graph) {}
 
+
+
+    auto quantifier_semantics(logic_quantifier_bound_t const& quantifier, unsigned long long node_i, logic_formula_t const& formula) -> bool {
+        auto&& [given_count, given_is_E] = quantifier;
+
+        auto atp_func = [&](auto&& x) { 
+            return given_is_E ? graph.all_adj(x) : graph.all_nonadj(x); };
+
+        auto actual_count = 0;
+        for (auto &&adj : atp_func(node_i)) {
+            if (this->evaluate({adj, formula})) {
+                ++actual_count;
+                if (given_count == 0) {
+                    // \exists
+                    return true;
+                } else if (actual_count >= given_count) {
+                    // \exists <count
+                    return false;
+                }
+            }
+        }
+
+        if (given_count == 0) {
+            assert (actual_count == 0);
+            // \exists 
+            return false;
+        } else {
+            assert (actual_count < given_count);
+            return true;
+        }
+    }
+
+    auto quantifier_semantics(logic_quantifier_modulo_t const& quantifier, unsigned long long node_i, logic_formula_t const& formula) -> bool {
+        auto&& [given_mod, given_is_E] = quantifier;
+
+        auto atp_func = [&](auto&& x) { 
+            return given_is_E ? graph.all_adj(x) : graph.all_nonadj(x); };
+
+        auto actual_count = 0;
+        for (auto &&adj : atp_func(node_i)) {
+            if (this->evaluate({adj, formula})) {
+                ++actual_count;
+            }
+        }
+
+        if (actual_count % given_mod == 0) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    auto quantifier_semantics(logic_quantifier_binmod_t const& quantifier, unsigned long long node_i, logic_formula_t const& formula) -> bool {
+        auto&& [given_modulo_is_one, given_is_E] = quantifier;
+
+        auto atp_func = [&](auto&& x) { 
+            return given_is_E ? graph.all_adj(x) : graph.all_nonadj(x); };
+
+        auto actual_count = 0;
+        for (auto &&adj : atp_func(node_i)) {
+            if (this->evaluate({adj, formula})) {
+                ++actual_count;
+            }
+        }
+
+        if (given_modulo_is_one) {
+            if (actual_count % 2 == 1) {
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            if (actual_count % 2 == 0) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+    }
+
+    auto quantifier_semantics(logic_quantifier_bincount_t const& quantifier, unsigned long long node_i, logic_formula_t const& formula) -> bool {
+        auto&& [given_is_digit_not_carry, given_is_E] = quantifier;
+
+        auto atp_func = [&](auto&& x) { 
+            return given_is_E ? graph.all_adj(x) : graph.all_nonadj(x); };
+
+        auto actual_count = 0;
+        for (auto &&adj : atp_func(node_i)) {
+            if (this->evaluate({adj, formula})) {
+                ++actual_count;
+            }
+        }
+
+        if (given_is_digit_not_carry) {
+            if (actual_count % 2 > 0) {
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            if (actual_count / 2 > 0) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+    }
+
     auto evaluate(args_t args) -> bool {
         if (auto it = results.find(args); it != results.end()) {
             // std::cout << "\t" << std::get<1>(args) << " HIT \n" << std::flush;
@@ -156,39 +424,12 @@ public:
             return true;
         }
 
-        auto [given_count, given_is_E] = formula.back();
-
+        auto quantifier = formula.back();
         formula.pop_back();
-        auto actual_count = 0;
 
-        auto atp_func = [&](auto&& x) { 
-            return given_is_E ? graph.all_adj(x) : graph.all_nonadj(x); };
-
-        for (auto &&adj : atp_func(node_i)) {
-            if (this->evaluate({adj, formula})) {
-                ++actual_count;
-                if (given_count == 0) {
-                    // \exists
-                    results[args] = true;
-                    return true;
-                } else if (actual_count >= given_count) {
-                    // \exists <count
-                    results[args] = false;
-                    return false;
-                }
-            }
-        }
-
-        if (given_count == 0) {
-            assert (actual_count == 0);
-            // \exists 
-            results[args] = false;
-            return false;
-        } else {
-            assert (actual_count < given_count);
-            results[args] = true;
-            return true;
-        }
+        auto result = this->quantifier_semantics(quantifier, node_i, formula);
+        results[args] = result;
+        return result;
     }
 
     wl::SmallGraph const& graph;
@@ -354,24 +595,20 @@ int main(int argc, char* argv[]) {
 
 
 
-    return 0;
+    // return 0;
 
-    // model1 -> model2
-    const auto model_map1 = std::unordered_map<int, int>{
-        {0, 0}, {1, 8}, {2, 1}, {3, 3}, {4, 2}, {5, 5}, {6, 4}, {7, 7}, {8, 6}, {9, 9}, {10, 10}
-    };
-
-    // model2 -> model1
-    const auto model_map2 = std::unordered_map<int, int>{
-        {0, 0}, {1, 2}, {2, 4}, {3, 3}, {4, 6}, {5, 5}, {6, 8}, {7, 7}, {8, 1}, {9, 9}, {10, 10}
-    };
+    // // model1 -> model2
+    // const auto model_map1 = std::unordered_map<int, int>{
+    //     {0, 0}, {1, 8}, {2, 1}, {3, 3}, {4, 2}, {5, 5}, {6, 4}, {7, 7}, {8, 6}, {9, 9}, {10, 10}
+    // };
+    // // model2 -> model1
+    // const auto model_map2 = std::unordered_map<int, int>{
+    //     {0, 0}, {1, 2}, {2, 4}, {3, 3}, {4, 6}, {5, 5}, {6, 8}, {7, 7}, {8, 1}, {9, 9}, {10, 10}
+    // };
 
     for (auto &&[args1, result1] : b1) {
         auto [model1, formula] = args1;
-        
-        auto it = model_map1.find(model1);
-        assert(it != model_map1.end());
-        auto model2 = it->second;
+        auto model2 = model1;
         auto args2 = std::make_tuple(model2, formula);
         assert (b2.find(args2) != b2.end());
         auto&& result2 = b2[args2];
@@ -382,64 +619,64 @@ int main(int argc, char* argv[]) {
 
     std::cout << "\ndebug eval\n";
 
-    using qtype = logic_quantifier_bound_t;
+    using qtype = typename logic_formula_t::value_type;
 
-    auto formulalist1 = std::vector<EvaluatorLogicPaths::args_t>{
-        {1, {qtype{.count = 3, .is_E = true}, qtype{.count = 2, .is_E = true} }},
-        {3, {qtype{.count = 3, .is_E = true}, qtype{.count = 2, .is_E = true} }},
-        {4, {qtype{.count = 3, .is_E = true}, qtype{.count = 2, .is_E = true} }},
+    // auto formulalist1 = std::vector<EvaluatorLogicPaths::args_t>{
+    //     {1, {qtype{.count = 3, .is_E = true}, qtype{.count = 2, .is_E = true} }},
+    //     {3, {qtype{.count = 3, .is_E = true}, qtype{.count = 2, .is_E = true} }},
+    //     {4, {qtype{.count = 3, .is_E = true}, qtype{.count = 2, .is_E = true} }},
         
-        {6, {qtype{.count = 3, .is_E = true},}},
-        {10, {qtype{.count = 3, .is_E = true},}},
-        {9, {qtype{.count = 3, .is_E = true},}},
+    //     {6, {qtype{.count = 3, .is_E = true},}},
+    //     {10, {qtype{.count = 3, .is_E = true},}},
+    //     {9, {qtype{.count = 3, .is_E = true},}},
 
-        {7, {qtype{.count = 3, .is_E = true},}},
+    //     {7, {qtype{.count = 3, .is_E = true},}},
 
-        {8, {qtype{.count = 3, .is_E = true},}},
+    //     {8, {qtype{.count = 3, .is_E = true},}},
 
-        // === === ===
+    //     // === === ===
 
-    };
+    // };
 
-    for (auto &&args1 : formulalist1) { 
-        auto model1 = std::get<0>(args1);
-        auto formula = std::get<1>(args1);
-        auto it = model_map1.find(model1);
-        assert(it != model_map1.end());
-        auto model2 = it->second;
-        auto args2 = std::make_tuple(model2, formula);
+    // for (auto &&args1 : formulalist1) { 
+    //     auto model1 = std::get<0>(args1);
+    //     auto formula = std::get<1>(args1);
+    //     auto it = model_map1.find(model1);
+    //     assert(it != model_map1.end());
+    //     auto model2 = it->second;
+    //     auto args2 = std::make_tuple(model2, formula);
         
-        std::cout << model1 << " " << model2 << " [] " << formula << " " << b1[args1] << " " << b2[args2] << "\n";
-    }
+    //     std::cout << model1 << " " << model2 << " [] " << formula << " " << b1[args1] << " " << b2[args2] << "\n";
+    // }
 
     
 
-    std::cout << "\n";
+    // std::cout << "\n";
 
-    auto formulalist2 = std::vector<EvaluatorLogicPaths::args_t>{
-        {2, {qtype{.count = 3, .is_E = true}, qtype{.count = 2, .is_E = true} }},
-        {3, {qtype{.count = 3, .is_E = true}, qtype{.count = 2, .is_E = true} }},
-        {6, {qtype{.count = 3, .is_E = true}, qtype{.count = 2, .is_E = true} }},
+    // auto formulalist2 = std::vector<EvaluatorLogicPaths::args_t>{
+    //     {2, {qtype{.count = 3, .is_E = true}, qtype{.count = 2, .is_E = true} }},
+    //     {3, {qtype{.count = 3, .is_E = true}, qtype{.count = 2, .is_E = true} }},
+    //     {6, {qtype{.count = 3, .is_E = true}, qtype{.count = 2, .is_E = true} }},
 
-        {1, {qtype{.count = 3, .is_E = true},}},
-        {2, {qtype{.count = 3, .is_E = true},}},
-        {9, {qtype{.count = 3, .is_E = true},}},
+    //     {1, {qtype{.count = 3, .is_E = true},}},
+    //     {2, {qtype{.count = 3, .is_E = true},}},
+    //     {9, {qtype{.count = 3, .is_E = true},}},
 
-        {7, {qtype{.count = 3, .is_E = true},}},
+    //     {7, {qtype{.count = 3, .is_E = true},}},
 
-        {6, {qtype{.count = 3, .is_E = true},}},
-    };
+    //     {6, {qtype{.count = 3, .is_E = true},}},
+    // };
 
-    for (auto &&args2 : formulalist2) {
-        auto model2 = std::get<0>(args2);
-        auto formula = std::get<1>(args2);
-        auto it = model_map2.find(model2);
-        assert(it != model_map2.end());
-        auto model1 = it->second;
-        auto args1 = std::make_tuple(model1, formula);
+    // for (auto &&args2 : formulalist2) {
+    //     auto model2 = std::get<0>(args2);
+    //     auto formula = std::get<1>(args2);
+    //     auto it = model_map2.find(model2);
+    //     assert(it != model_map2.end());
+    //     auto model1 = it->second;
+    //     auto args1 = std::make_tuple(model1, formula);
         
-        std::cout << model1 << " " << model2 << " [] " << formula << " " << b1[args1] << " " << b2[args2] << "\n";
-    }
+    //     std::cout << model1 << " " << model2 << " [] " << formula << " " << b1[args1] << " " << b2[args2] << "\n";
+    // }
 
 
 
