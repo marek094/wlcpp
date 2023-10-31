@@ -9,6 +9,7 @@
 #include <set>
 #include <map>
 #include <coroutine>
+#include <compare>
 // #include <generator>
 #include "ref_generator.hpp"
 
@@ -24,14 +25,9 @@
 
 
 
-struct logic_formula_step_t {
+struct logic_quantifier_bound_t {
     int count;
     bool is_E;
-
-    // ==
-    auto operator==(logic_formula_step_t const& other) const -> bool {
-        return count == other.count && is_E == other.is_E;
-    }
 
     auto static forall_count() -> generator<int> {
         constexpr auto kMaxCount = 10;
@@ -45,10 +41,10 @@ struct logic_formula_step_t {
         // co_yield false;
     }
 
-    auto static forall() -> generator<logic_formula_step_t> {
+    auto static forall() -> generator<logic_quantifier_bound_t> {
         for (auto &&count : forall_count()) {
             for (auto &&is_E : forall_is_E()) {
-                co_yield logic_formula_step_t{.count = count, .is_E = is_E};
+                co_yield logic_quantifier_bound_t{.count = count, .is_E = is_E};
             }
         }
     }
@@ -70,27 +66,21 @@ struct logic_formula_step_t {
     }
 
     // print me as << "E()"
-    friend auto operator<<(std::ostream& os, logic_formula_step_t const& step) -> std::ostream& {
+    friend auto operator<<(std::ostream& os, logic_quantifier_bound_t const& step) -> std::ostream& {
         os << step.to_string();
         return os;
     }
 
-    // sorting operator <=>
-    auto operator<(logic_formula_step_t const& other) const -> bool {
-        if (this->count < other.count) {
-            return true;
-        }
-        if (this->count > other.count) {
-            return false;
-        }
-        return this->is_E < other.is_E;
-    }
+    auto operator==(logic_quantifier_bound_t const& other) const -> bool = default;
+    auto operator<=>(logic_quantifier_bound_t const& other) const -> std::strong_ordering = default;
 };
 
 
 
 
-using logic_formula_t = std::vector<logic_formula_step_t>;
+using logic_formula_t = std::vector<logic_quantifier_bound_t>;
+
+
 auto operator<< (std::ostream& os, logic_formula_t const& formula) -> std::ostream& {
     os << "{ ";
     int i = 0;
@@ -118,7 +108,7 @@ struct component {
 };
 
 
-// specialization for vector<logic_formula_step_t>
+// specialization for vector<logic_quantifier_bound_t>
 template<>
 struct component<logic_formula_t> {
     logic_formula_t const& value;
@@ -146,7 +136,7 @@ public:
 
 class EvaluatorLogicPaths {
 public:
-    using args_t = std::tuple<unsigned long long, std::vector<logic_formula_step_t>>;
+    using args_t = std::tuple<unsigned long long, logic_formula_t>;
     using result_t = std::pair<args_t, bool>;
     using evaluated_t = std::unordered_map<args_t, bool, hash_tuple>;
 
@@ -214,7 +204,7 @@ auto gen_cold_formulas(int quantifier_depth) -> generator<logic_formula_t> {
     }
 
     for (logic_formula_t &&formula : gen_cold_formulas(quantifier_depth - 1)) {
-        for (auto &&step : logic_formula_step_t::forall()) {
+        for (auto &&step : logic_formula_t::value_type::forall()) {
             auto formula_copy = formula;
             formula_copy.push_back(step);
             co_yield formula_copy;
@@ -392,18 +382,20 @@ int main(int argc, char* argv[]) {
 
     std::cout << "\ndebug eval\n";
 
+    using qtype = logic_quantifier_bound_t;
+
     auto formulalist1 = std::vector<EvaluatorLogicPaths::args_t>{
-        {1, {logic_formula_step_t{.count = 3, .is_E = true}, logic_formula_step_t{.count = 2, .is_E = true} }},
-        {3, {logic_formula_step_t{.count = 3, .is_E = true}, logic_formula_step_t{.count = 2, .is_E = true} }},
-        {4, {logic_formula_step_t{.count = 3, .is_E = true}, logic_formula_step_t{.count = 2, .is_E = true} }},
+        {1, {qtype{.count = 3, .is_E = true}, qtype{.count = 2, .is_E = true} }},
+        {3, {qtype{.count = 3, .is_E = true}, qtype{.count = 2, .is_E = true} }},
+        {4, {qtype{.count = 3, .is_E = true}, qtype{.count = 2, .is_E = true} }},
         
-        {6, {logic_formula_step_t{.count = 3, .is_E = true},}},
-        {10, {logic_formula_step_t{.count = 3, .is_E = true},}},
-        {9, {logic_formula_step_t{.count = 3, .is_E = true},}},
+        {6, {qtype{.count = 3, .is_E = true},}},
+        {10, {qtype{.count = 3, .is_E = true},}},
+        {9, {qtype{.count = 3, .is_E = true},}},
 
-        {7, {logic_formula_step_t{.count = 3, .is_E = true},}},
+        {7, {qtype{.count = 3, .is_E = true},}},
 
-        {8, {logic_formula_step_t{.count = 3, .is_E = true},}},
+        {8, {qtype{.count = 3, .is_E = true},}},
 
         // === === ===
 
@@ -425,17 +417,17 @@ int main(int argc, char* argv[]) {
     std::cout << "\n";
 
     auto formulalist2 = std::vector<EvaluatorLogicPaths::args_t>{
-        {2, {logic_formula_step_t{.count = 3, .is_E = true}, logic_formula_step_t{.count = 2, .is_E = true} }},
-        {3, {logic_formula_step_t{.count = 3, .is_E = true}, logic_formula_step_t{.count = 2, .is_E = true} }},
-        {6, {logic_formula_step_t{.count = 3, .is_E = true}, logic_formula_step_t{.count = 2, .is_E = true} }},
+        {2, {qtype{.count = 3, .is_E = true}, qtype{.count = 2, .is_E = true} }},
+        {3, {qtype{.count = 3, .is_E = true}, qtype{.count = 2, .is_E = true} }},
+        {6, {qtype{.count = 3, .is_E = true}, qtype{.count = 2, .is_E = true} }},
 
-        {1, {logic_formula_step_t{.count = 3, .is_E = true},}},
-        {2, {logic_formula_step_t{.count = 3, .is_E = true},}},
-        {9, {logic_formula_step_t{.count = 3, .is_E = true},}},
+        {1, {qtype{.count = 3, .is_E = true},}},
+        {2, {qtype{.count = 3, .is_E = true},}},
+        {9, {qtype{.count = 3, .is_E = true},}},
 
-        {7, {logic_formula_step_t{.count = 3, .is_E = true},}},
+        {7, {qtype{.count = 3, .is_E = true},}},
 
-        {6, {logic_formula_step_t{.count = 3, .is_E = true},}},
+        {6, {qtype{.count = 3, .is_E = true},}},
     };
 
     for (auto &&args2 : formulalist2) {
