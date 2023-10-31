@@ -29,7 +29,7 @@ auto read_graph_from_tree_txt_file(std::string const& filename, size_t limit = (
         while (ss >> u >> v) {
             graph.num_vertices = std::max(graph.num_vertices, u+1);
             graph.num_vertices = std::max(graph.num_vertices, v+1);
-            graph.edges.emplace_back(u, v);
+            graph.add_edge(u, v);
         }
         
 

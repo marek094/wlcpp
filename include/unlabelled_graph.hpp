@@ -4,8 +4,11 @@
 #include <utility>
 #include <algorithm>
 #include <ranges>
+#include <set>
 
 #include <Eigen/Dense>
+
+#include "ref_generator.hpp"
 
 namespace wl {
 
@@ -35,8 +38,8 @@ public:
         return D;
     }
 
-    auto number_of_vertices() const -> vertex_t {
-        return num_vertices;
+    auto number_of_vertices() const -> size_t {
+        return static_cast<size_t>(num_vertices);
         // if (edges.empty()) {
         //     return 0;
         // }
@@ -50,11 +53,57 @@ public:
         // return num_vertices;
     }
 
+    auto add_edge(vertex_t u, vertex_t v) -> void {
+        edges.emplace_back(u, v);
+        if (u >= adj_list.size()) {
+            adj_list.resize(u+1, {});
+        }
+        adj_list[u].push_back(v);
+        
+        if (v >= adj_list.size()) {
+            adj_list.resize(v+1, {});
+        }
+        
+        adj_list[v].push_back(u);
+    }
+
+    auto all_adj(vertex_t node) const -> generator<vertex_t> {
+        assert (node < adj_list.size());
+        for (auto &&adj : adj_list[node]) {
+            if (adj != node) {
+                co_yield adj;
+            }
+        }
+    }
+
+    auto all_nonadj(vertex_t node) const -> generator<vertex_t> {
+        assert (node < adj_list.size());
+        auto set = std::set<vertex_t>{};
+        for (auto &&adj : adj_list[node]) {
+            set.insert(adj);
+        }
+        for (vertex_t nonadj = 0; nonadj < adj_list.size(); ++nonadj) {
+            if ((nonadj != node) && (set.find(nonadj) == set.end())) {
+                co_yield nonadj;
+            }
+        }
+    }
+
+
+    auto all_edges() const -> generator<std::pair<vertex_t, vertex_t>> {
+        for (auto &&[u,v] : edges) {
+            co_yield std::pair{u, v};
+            co_yield std::pair{v, u};
+        }
+    }
 
     using type = vertex_t;
-    std::vector<std::pair<vertex_t, vertex_t>> edges;
     std::vector<unsigned long long> labels;
     unsigned long long num_vertices;
+
+private:
+    std::vector<std::vector<vertex_t>> adj_list;
+    std::vector<std::pair<vertex_t, vertex_t>> edges;
 };
 
 

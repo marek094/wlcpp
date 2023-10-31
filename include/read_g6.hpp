@@ -147,7 +147,7 @@ auto graph6_to_graph(std::string const&input) -> SmallGraph {
         // std::cout << "XX " << std::bitset<6>(decode_byte(input[index])) << "; " << std::bitset<6>(pointer) << "; ";
 
         if (decode_byte(input[index]) & pointer) {
-            graph.edges.emplace_back(row, col);
+            graph.add_edge(row, col);
             // std:: cout << 1 << '\t' << row << " " << col <<'\n';
         } else {
             // std:: cout << 0 << '\t' << row << " " << col <<'\n';

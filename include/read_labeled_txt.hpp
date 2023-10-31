@@ -40,7 +40,7 @@ auto read_graph_from_labeled_txt_file(std::string const& filename, size_t limit 
         for (unsigned long long i = 0; i < m; ++i) {
             unsigned long long u, v;
             file >> u >> v;
-            graph.edges.emplace_back(u, v);
+            graph.add_edge(u, v);
         }
 
         graphs.push_back(graph);
