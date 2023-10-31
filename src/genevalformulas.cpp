@@ -35,7 +35,7 @@ struct logic_formula_step_t {
 
     auto static forall_count() -> generator<int> {
         constexpr auto kMaxCount = 10;
-        for (int i = 3; i < kMaxCount; ++i) {
+        for (int i = 1; i < kMaxCount; ++i) {
             co_yield i;
         }
     }
@@ -86,6 +86,8 @@ struct logic_formula_step_t {
         return this->is_E < other.is_E;
     }
 };
+
+
 
 
 using logic_formula_t = std::vector<logic_formula_step_t>;
@@ -255,19 +257,17 @@ int main(int argc, char* argv[]) {
         omp_set_num_threads(std::atoi(argv[2]));
     }
     
-    size_t limit = -1;
+    int q_depth = 1;
     if (argc >= 4) {
-        limit = std::atoi(argv[3]);
+        q_depth = std::atoi(argv[3]);
     }
 
-    size_t skip = 0;
-    if (argc >= 5) {
-        skip = std::atoi(argv[4]);
-    }
 
     std::filesystem::path file_path = argv[1];
 
     auto graph_list = [&]() {
+        auto limit = ~0ULL;
+        auto skip = 0;
         if (file_path.extension() == ".txt" && file_path.stem().string().substr(0, 4) == "tree") {    
             return wl::read_graph_from_tree_txt_file(file_path, limit, skip);
         } else
@@ -285,7 +285,6 @@ int main(int argc, char* argv[]) {
     auto start = std::chrono::steady_clock::now();
     
     assert (graph_list.size() == 2);
-    int q_depth = 5;
 
     auto b1 = check_formulas_on_graph(graph_list[0], q_depth);
     std::cout << "Graph 1 done.\n";
