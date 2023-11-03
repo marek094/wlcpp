@@ -17,6 +17,7 @@ template <typename vertex_t>
 class Graph {
 public:
     using EigenMatrixXu64 = Eigen::Matrix<uint64_t, Eigen::Dynamic, Eigen::Dynamic>;
+    using vertex_type = vertex_t;
 
     auto to_adjacency_matrix() const -> EigenMatrixXu64 {
         auto n = this->number_of_vertices();
@@ -65,6 +66,12 @@ public:
         }
         
         adj_list[v].push_back(u);
+    }
+
+    auto all(vertex_t) const -> generator<vertex_t> {
+        for (vertex_t node = 0; node < adj_list.size(); ++node) {
+            co_yield node;
+        }
     }
 
     auto all_adj(vertex_t node) const -> generator<vertex_t> {
