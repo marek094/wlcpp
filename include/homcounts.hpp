@@ -23,12 +23,13 @@
 
 #pragma once
 
-#include <vector>
-#include <utility>
+#include "unlabelled_graph.hpp"
 
 #include <Eigen/Dense>
 
-#include "unlabelled_graph.hpp"
+#include <vector>
+#include <utility>
+
 
 namespace wl {
 

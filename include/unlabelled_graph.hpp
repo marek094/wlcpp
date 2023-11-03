@@ -1,14 +1,15 @@
 #pragma once
 
+#include "ref_generator.hpp"
+
+#include <Eigen/Dense>
+
 #include <vector>
 #include <utility>
 #include <algorithm>
 #include <ranges>
 #include <set>
 
-#include <Eigen/Dense>
-
-#include "ref_generator.hpp"
 
 namespace wl {
 

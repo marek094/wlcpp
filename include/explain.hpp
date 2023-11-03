@@ -1,13 +1,13 @@
 #pragma once 
 
+#include "unlabelled_graph.hpp"
+#include "wl.hpp"
+
 #include <string>
 #include <vector>
 #include <unordered_map>
 #include <sstream>
 #include <set>
-
-#include "unlabelled_graph.hpp"
-#include "wl.hpp"
 
 namespace wl {
 
