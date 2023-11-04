@@ -24,15 +24,15 @@
 
 // hash std::vector<ull> to ull
 
-struct hash_vec {
-    size_t operator()(std::vector<unsigned long long> const& vec) const {
-        size_t seed = vec.size();
-        for (auto &&i : vec) {
-            seed ^= i + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        }
-        return seed;
-    }
-};
+// struct hash_vec {
+//     size_t operator()(std::vector<unsigned long long> const& vec) const {
+//         size_t seed = vec.size();
+//         for (auto &&i : vec) {
+//             seed ^= i + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+//         }
+//         return seed;
+//     }
+// };
 
 
 int main(int argc, char* argv[]) {
@@ -95,7 +95,7 @@ int main(int argc, char* argv[]) {
     // homvec -> list of graphs
     auto eq_classes_vec = std::vector<std::pair<std::vector<unsigned long long>, std::vector<int>>>{};
     {
-        auto eq_classes = std::unordered_map<std::vector<unsigned long long>, std::vector<int>, hash_vec>{};
+        auto eq_classes = std::unordered_map<std::vector<unsigned long long>, std::vector<int>, wl::hash_vec>{};
         int i = 0;
         for (auto&& hom_counts : results) {
             eq_classes[hom_counts].push_back(i);
