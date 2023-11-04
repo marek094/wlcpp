@@ -137,26 +137,25 @@ int main(int argc, char* argv[]) {
                     if (type1 != type2) {
                         all_equal = false;
 
+                        // std::cout << "Found non-equal types for graphs " << graph_idcs[i] << " and " << graph_idcs[j] << ".\n";
+                        // graph_list[graph_idcs[i]].print_as_txt_line(std::cout);
+                        // graph_list[graph_idcs[j]].print_as_txt_line(std::cout);
 
-                        std::cout << "Found non-equal types for graphs " << graph_idcs[i] << " and " << graph_idcs[j] << ".\n";
-                        graph_list[graph_idcs[i]].print_as_txt_line(std::cout);
-                        graph_list[graph_idcs[j]].print_as_txt_line(std::cout);
+                        // for (auto &&fla : type1) {
+                        //     if (type2.find(fla) == type2.end()) {
+                        //         std::cout << fla << "\n";
+                        //     }
+                        // }
 
-                        for (auto &&fla : type1) {
-                            if (type2.find(fla) == type2.end()) {
-                                std::cout << fla << "\n";
-                            }
-                        }
-
-                        std::cout << "-\n";
+                        // std::cout << "-\n";
                         
-                        for (auto &&fla : type2) {
-                            if (type1.find(fla) == type1.end()) {
-                                std::cout << fla << "\n";
-                            }
-                        }
+                        // for (auto &&fla : type2) {
+                        //     if (type1.find(fla) == type1.end()) {
+                        //         std::cout << fla << "\n";
+                        //     }
+                        // }
 
-                        std::cout << "\n";
+                        // std::cout << "\n";
                     }
                 }
             }
@@ -171,9 +170,10 @@ int main(int argc, char* argv[]) {
             std::cout << "Not all types are equal.\n";
         }
     }
-    
+
+
     // return 0;
-    
+
     
     size_t sqrt_m = static_cast<size_t>(std::sqrt(eq_classes_vec.size()));
 
@@ -205,8 +205,8 @@ int main(int argc, char* argv[]) {
         
         const auto class1 = eq_classes_vec[cl1];
         for (auto&& idx1 : class1.second) {
-            auto&& graph1 = graph_list[cl1];
-            auto logic_tp1 = wl::compute_type<QuantifierT>(graph1, rank);
+            auto&& graph1 = graph_list[idx1];
+            auto logic_tp1 = graph_types[idx1];
 
             for (int cl2 : indices2) {
                 assert(cl1 != cl2);
@@ -215,9 +215,19 @@ int main(int argc, char* argv[]) {
 
                     for (auto&& idx2 : class2.second) {
                         auto&& graph2 = graph_list[idx2];
-                        auto logic_tp2 = wl::compute_type<QuantifierT>(graph2, rank);
+                        auto logic_tp2 = graph_types[idx2];
                         if (logic_tp1 == logic_tp2) {
                             nonhypothesis += 1;
+                            std::cout << "Found non-hypothesis pair: " << idx1 << " and " << idx2 << "\n";
+                            // graph1.print_as_txt_line(std::cout);
+                            // graph2.print_as_txt_line(std::cout);
+                            // std::cout << "\n";
+                            for (auto &&fla : logic_tp1) {
+                                if (logic_tp2.find(fla) == logic_tp2.end()) {
+                                    std::cout << fla << "\n";
+                                }
+                            }
+                            std::cout << "-\n";
                         }
                     }
             }
