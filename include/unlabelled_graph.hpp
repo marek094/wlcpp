@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <ranges>
 #include <set>
+#include <iostream>
 
 
 namespace wl {
@@ -41,7 +42,9 @@ public:
     }
 
     auto number_of_vertices() const -> size_t {
+        assert (num_vertices == adj_list.size());
         return static_cast<size_t>(num_vertices);
+        // return adj_list.size();
         // if (edges.empty()) {
         //     return 0;
         // }
@@ -140,8 +143,8 @@ public:
     std::vector<unsigned long long> labels;
     unsigned long long num_vertices;
 
-private:
     std::vector<std::vector<vertex_t>> adj_list;
+private:
     std::vector<std::pair<vertex_t, vertex_t>> edges;
 };
 

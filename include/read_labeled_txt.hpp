@@ -27,6 +27,7 @@ auto read_graph_from_labeled_txt_file(std::string const& filename, size_t limit 
         // std::cout << n << " " << m << " " << has_labels << '\n';
         auto graph = SmallGraph{};
         graph.num_vertices = n;
+        graph.adj_list.resize(n);
         
         if (has_labels) {
             graph.labels.reserve(n);

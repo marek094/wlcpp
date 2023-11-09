@@ -24,6 +24,7 @@ auto read_graph_from_tree_txt_file(std::string const& filename, size_t limit = (
         std::istringstream ss(line);
 
         auto graph = SmallGraph{};
+        graph.num_vertices = 0;
         
         unsigned long long u, v; 
         while (ss >> u >> v) {

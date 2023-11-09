@@ -279,6 +279,39 @@ struct LogicQuantifierBinCount : public LogicQuantifierBase<LogicQuantifierBinCo
 };
 
 
+struct LogicQuantifierFace : public LogicQuantifierBase<LogicQuantifierFace> {
+    int length = 0;
+
+    LogicQuantifierFace() = default;
+
+    auto val() const -> int const& {
+        return this->length;
+    }
+
+    auto val() -> int& {
+        return this->length;
+    }
+
+    auto static forall_impl() -> generator<int> {
+        constexpr auto kMaxCount = 9;
+        for (int i = 1; i <= kMaxCount; ++i) {
+            co_yield i;
+        }
+    }
+
+    auto to_string_impl(std::ostream& os) const -> void {
+        os << "P" << this->length;
+    }
+
+};
+
+
+
+
+
+
+
+
 template<LogicQuantifier T>
 struct LogicFormula {
 
@@ -500,6 +533,20 @@ public:
             }
         }
     }
+
+    auto quantifier_semantics(LogicQuantifierFace const& quantifier, unsigned long long node_i, LogicFormula<LogicQuantifierFace> const& formula) -> bool {
+        // true if there is \psi(a, x_1) & \psi(x_1, x_2) & ... & \psi(x_{l-2}, x_{l-1})
+        // where a and b are the first and last node in the path
+        // and where \psi(x,y) = E(x,y) & \phi(y)
+        // where \phi(c) = \phi(c, x_1) & \phi(x_1, x_2) & ... & \phi(x_{l-1}, c)
+        
+
+
+    }
+
+    
+
+
 
     auto evaluate(args_t args) -> bool {
         if (auto it = results.find(args); it != results.end()) {

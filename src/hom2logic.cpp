@@ -78,7 +78,6 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Read " << graph_list.size() << " graphs.\n";
 
-
     auto start = std::chrono::steady_clock::now();
 
 
@@ -88,14 +87,20 @@ int main(int argc, char* argv[]) {
         #pragma omp parallel for
         for (int i = 0; i < static_cast<int>(graph_list.size()); i++) {
             results[i] = wl::compute_path_homvec(graph_list[i], graph_list[i].number_of_vertices()+1);
+            // std::cout << i << "\n";
+            // for (auto &&h : results[i]) {
+            //     auto str = std::to_string(h);
+            //     for (int j=0; j < 5-str.size(); j++) std::cout << " ";
+            //     std::cout << str << "    ";
+            // }
+            // std::cout << "\n";
         }
     }
-
 
     // homvec -> list of graphs
     auto eq_classes_vec = std::vector<std::pair<std::vector<unsigned long long>, std::vector<int>>>{};
     {
-        auto eq_classes = std::unordered_map<std::vector<unsigned long long>, std::vector<int>, wl::hash_vec>{};
+        auto eq_classes = std::unordered_map<std::vector<unsigned long long>, std::vector<int>, wl::hash_vec<unsigned long long>>{};
         int i = 0;
         for (auto&& hom_counts : results) {
             eq_classes[hom_counts].push_back(i);
@@ -112,7 +117,7 @@ int main(int argc, char* argv[]) {
 
 
 
-    using QuantifierT = wl::LogicQuantifierBound;
+    using QuantifierT = wl::LogicQuantifierFace;
     
     auto graph_types = std::vector< std::unordered_set< wl::LogicFormula<QuantifierT>>>{};
     {
