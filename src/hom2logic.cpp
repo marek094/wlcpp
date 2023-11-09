@@ -117,7 +117,27 @@ int main(int argc, char* argv[]) {
 
 
 
-    using QuantifierT = wl::LogicQuantifierFace;
+    // using QuantifierT = wl::LogicQuantifierFace;
+    using QuantifierT = wl::LogicQuantifierCount;
+
+    // {
+    //     for (size_t i = 0; i < graph_list.size(); ++i) {
+    //         std::cout << "Graph " << i << "\n";
+    //         auto&& graph = graph_list[i];
+    //         auto evaluator = wl::EvaluatorLogicPaths<QuantifierT>{ graph };
+    //         for (int node_i = 0; node_i < graph.number_of_vertices(); ++node_i) {
+    //             for (auto formula : wl::gen_cold_formulas<QuantifierT>(rank)) {
+    //                 auto r = evaluator.evaluate({node_i, formula});
+    //                 if (r) {
+    //                     std::cout << node_i << "\t" << formula << "\n";
+    //                 }
+    //             }
+    //         }
+    //         std::cout << "\n";
+    //     }
+    // }
+
+
     
     auto graph_types = std::vector< std::unordered_set< wl::LogicFormula<QuantifierT>>>{};
     {
@@ -188,8 +208,13 @@ int main(int argc, char* argv[]) {
     // std::mt19937 g(rd());
     std::mt19937 g(0);
 
-    auto indices1 = std::vector<size_t>(sqrt_m);
-    auto indices2 = std::vector<size_t>(sqrt_m);
+    // auto indices1 = std::vector<size_t>(sqrt_m);
+    // auto indices2 = std::vector<size_t>(sqrt_m);
+    auto indices1 = std::vector<size_t>(eq_classes_vec.size());
+    for (int i = 0; i < eq_classes_vec.size(); ++i) {
+        indices1[i] = i;
+    }
+    auto indices2 = indices1;
     
     {
         auto range = std::ranges::iota_view(0UL, eq_classes_vec.size()) | std::views::common;
@@ -214,7 +239,7 @@ int main(int argc, char* argv[]) {
             auto logic_tp1 = graph_types[idx1];
 
             for (int cl2 : indices2) {
-                assert(cl1 != cl2);
+                if (cl1 == cl2) continue;
                 const auto class2 = eq_classes_vec[cl2];
                 count += class1.second.size() * class2.second.size();
 

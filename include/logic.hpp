@@ -79,7 +79,7 @@ struct LogicQuantifierBase {
 
     auto static forall_is_E() -> generator<bool> {
         co_yield true;
-        // co_yield false;
+        co_yield false;
     
     }
 
@@ -163,6 +163,63 @@ concept LogicQuantifier = requires(T a, const T b, std::ostream& os) {
     { T::forall_impl() } -> std::same_as<generator<std::remove_reference_t<decltype(a.val())>>>;
     { a.to_string_impl(os) } -> std::same_as<void>;
 };
+
+
+
+
+struct LogicQuantifierEqOne : public LogicQuantifierBase<LogicQuantifierEqOne> {
+    bool is_eq = 0;
+
+    LogicQuantifierEqOne() = default;
+
+    auto val() const -> bool const& {
+        return this->is_eq;
+    }
+
+    auto val() -> bool& {
+        return this->is_eq;
+    }
+
+    auto static forall_impl() -> generator<bool> {
+        co_yield 0;
+        co_yield 1;
+    }
+
+    auto to_string_impl(std::ostream& os) const -> void {
+        if (this->is_eq) {
+            os << "==1";
+        } else {
+            os << "!=1";
+        }
+    }
+
+};
+
+struct LogicQuantifierCount : public LogicQuantifierBase<LogicQuantifierCount> {
+    int count = 0;
+
+    LogicQuantifierCount() = default;
+
+    auto val() const -> int const& {
+        return this->count;
+    }
+
+    auto val() -> int& {
+        return this->count;
+    }
+
+    auto static forall_impl() -> generator<int> {
+        co_yield 0;
+        co_yield 1;
+        co_yield 2;
+    }
+
+    auto to_string_impl(std::ostream& os) const -> void {
+        os << "==" << this->count;
+    }
+
+};
+
 
 
 struct LogicQuantifierBound : public LogicQuantifierBase<LogicQuantifierBound> {
@@ -446,6 +503,36 @@ public:
         return &wl::SmallGraph::all;
     }
     
+
+    auto quantifier_semantics(LogicQuantifierCount const& quantifier, unsigned long long node_i, LogicFormula<LogicQuantifierCount> const& formula) -> bool {
+        auto actual_count = 0;
+        for (auto &&adj : atp_scope(quantifier)(graph, node_i)) {
+            if (this->evaluate({adj, formula})) {
+                ++actual_count;
+                if (actual_count > quantifier.count) {
+                    return false;
+                }
+            }
+        }
+
+        return actual_count == quantifier.count;
+    }
+
+    auto quantifier_semantics(LogicQuantifierEqOne const& quantifier, unsigned long long node_i, LogicFormula<LogicQuantifierEqOne> const& formula) -> bool {
+        auto actual_count = 0;
+        for (auto &&adj : atp_scope(quantifier)(graph, node_i)) {
+            if (this->evaluate({adj, formula})) {
+                ++actual_count;
+                if (actual_count > 1) {
+                    return !quantifier.is_eq;
+                }
+            }
+        }
+
+        return (quantifier.is_eq) == (actual_count == 1);
+    }
+
+
 
     auto quantifier_semantics(LogicQuantifierBound const& quantifier, unsigned long long node_i, LogicFormula<LogicQuantifierBound> const& formula) -> bool {
         auto actual_count = 0;

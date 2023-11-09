@@ -125,6 +125,7 @@ auto graph6_to_graph(std::string const&input) -> SmallGraph {
 
     size_t index = 0;
     graph.num_vertices = decode_n(input, index);
+    graph.adj_list.resize(graph.num_vertices);
     auto n = graph.num_vertices;
 
     //    Suppose G has n vertices.  Write the upper triangle of the adjacency

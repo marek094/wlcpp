@@ -59,6 +59,8 @@ public:
     }
 
     auto add_edge(vertex_t u, vertex_t v) -> void {
+        adj_list.resize(num_vertices);
+
         edges.emplace_back(u, v);
         if (u >= adj_list.size()) {
             adj_list.resize(u+1, {});
