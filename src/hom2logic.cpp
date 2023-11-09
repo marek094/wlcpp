@@ -36,6 +36,7 @@
 
 
 int main(int argc, char* argv[]) {
+
     if (argc < 2) {
         std::cerr << "Usage: " << argv[0] << " <path_to_graph6_file>\n";
         return 1;
@@ -117,7 +118,8 @@ int main(int argc, char* argv[]) {
 
 
 
-    using QuantifierT = wl::LogicQuantifierFace;
+    using QuantifierT = wl::LogicQuantifierBound<1, 6>;
+    // using QuantifierT = wl::LogicQuantifierPartition<100>;
     
     auto graph_types = std::vector< std::unordered_set< wl::LogicFormula<QuantifierT>>>{};
     {

@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <ranges>
 #include <set>
+#include <memory>
 
 
 
@@ -59,6 +60,162 @@
 // // };
 
 namespace wl {
+
+
+struct hash_array {
+    template<typename T, size_t N>
+    auto operator()(std::array<T, N> const& arr) const -> size_t {
+        size_t seed = arr.size();
+        for (auto &&i : arr) {
+            seed ^= i + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        }
+        return seed;
+    }
+};
+
+
+
+namespace logic {
+
+
+
+struct ElementBase {
+    virtual auto to_string() const -> std::string = 0;
+
+    std::vector<std::shared_ptr<ElementBase>> children;
+};
+
+template<uint64_t NumFreeVariables>
+struct FormulaElementBase : public ElementBase {
+    using sigma_struct_t = wl::SmallGraph;
+    using variable_assignment_t = std::array<wl::SmallGraph::vertex_type, NumFreeVariables>;
+
+    virtual auto evaluate_impl(sigma_struct_t const&, variable_assignment_t const&) -> bool = 0;
+
+    auto evaluate(sigma_struct_t const& s, variable_assignment_t const& variable_assignment) -> bool {
+        if (auto it = evaluation.find(variable_assignment); it != evaluation.end()) {
+            return it->second;
+        }
+
+        auto result = this->evaluate_impl(s, variable_assignment);
+        evaluation[variable_assignment] = result;
+        return result;
+    }
+
+    std::unordered_map<variable_assignment_t, bool, hash_array> evaluation;
+};
+
+
+template<uint64_t NumFreeVariables, typename Derived>
+struct FormulaElement : public FormulaElementBase<NumFreeVariables> {
+    using variable_assignment_t = typename FormulaElementBase<NumFreeVariables>::variable_assignment_t;
+    using sigma_struct_t = typename FormulaElementBase<NumFreeVariables>::sigma_struct_t;
+    // using FormulaElementBase<NumFreeVariables>;
+
+    virtual auto evaluate_impl(sigma_struct_t const& s, variable_assignment_t const& variable_assignment) -> bool override {
+        return static_cast<Derived*>(this)->evaluate_(s, variable_assignment);
+    }
+};
+
+
+struct True : public FormulaElement<0, True> {
+    auto to_string() const -> std::string override {
+        return "T";
+    }
+
+    auto evaluate_(sigma_struct_t const&, variable_assignment_t const&) -> bool {
+        return true;
+    }
+};
+
+struct False : public FormulaElement<0, False> {
+    auto to_string() const -> std::string override {
+        return "F";
+    }
+
+    auto evaluate_(sigma_struct_t const&, variable_assignment_t const&) -> bool {
+        return false;
+    }
+};
+
+
+struct Adj : public FormulaElement<2, Adj> {
+    auto to_string() const -> std::string override {
+        return "A";
+    }
+
+    auto evaluate_(sigma_struct_t const& s, variable_assignment_t const& variable_assignment) -> bool {
+        auto [v1, v2] = variable_assignment;
+        auto const& adjs = s.adj_list[v1];
+        return std::find(adjs.begin(), adjs.end(), v2) != adjs.end(); 
+    }
+};
+
+struct NonAdj : public FormulaElement<2, NonAdj> {
+
+    auto to_string() const -> std::string override {
+        return "~A";
+    }
+
+    auto evaluate_(sigma_struct_t const& s, variable_assignment_t const& variable_assignment) -> bool {
+        auto [v1, v2] = variable_assignment;
+        auto const& adjs = s.adj_list[v1];
+        return std::find(adjs.begin(), adjs.end(), v2) == adjs.end(); 
+    }
+
+};
+
+struct Eq : public FormulaElement<2, Eq> {
+
+    auto to_string() const -> std::string override {
+        return "=";
+    }
+
+    auto evaluate(sigma_struct_t const&, variable_assignment_t const& variable_assignment) -> bool {
+        auto [v1, v2] = variable_assignment;
+        return v1 == v2;
+    }
+
+};
+
+
+struct NonEq : public FormulaElement<2, NonEq> {
+    
+        auto to_string() const -> std::string override {
+            return "~=";
+        }
+    
+        auto evaluate(sigma_struct_t const&, variable_assignment_t const& variable_assignment) -> bool {
+            auto [v1, v2] = variable_assignment;
+            return v1 != v2;
+        }
+    
+    };
+}
+
+
+// template<uint64_t NumFreeVariables>
+// struct Atp : public FormulaElement<NumFreeVariables, Atp<NumFreeVariables>> {
+//     using variable_assignment_t = typename FormulaElementBase<NumFreeVariables>::variable_assignment_t;
+//     using sigma_struct_t = typename FormulaElementBase<NumFreeVariables>::sigma_struct_t;
+
+//     auto to_string() const -> std::string override {
+//         return "atp_"s + NumFreeVariables;
+//     }
+
+//     auto evaluate_(sigma_struct_t const& s, variable_assignment_t const& variable_assignment_t) -> bool {
+        
+//     }
+// };
+
+
+
+} // namespace logic
+
+
+
+
+
 
 template<typename Derived>
 struct LogicQuantifierBase {
@@ -165,7 +322,13 @@ concept LogicQuantifier = requires(T a, const T b, std::ostream& os) {
 };
 
 
-struct LogicQuantifierBound : public LogicQuantifierBase<LogicQuantifierBound> {
+template<int MinCount, int MaxCount>
+struct LogicQuantifierBound : public LogicQuantifierBase<LogicQuantifierBound<MinCount, MaxCount>> {
+
+    // expose constants
+    static constexpr auto kMinCount = MinCount;
+    static constexpr auto kMaxCount = MaxCount;
+
     int count = 0;
 
     LogicQuantifierBound() = default;
@@ -179,13 +342,9 @@ struct LogicQuantifierBound : public LogicQuantifierBase<LogicQuantifierBound> {
     }
 
     auto static forall_impl() -> generator<int> {
-        constexpr auto kMaxCount = 9;
-        for (int i = 1; i <= kMaxCount; ++i) {
+        for (int i = MinCount; i <= MaxCount; ++i) {
             co_yield i;
         }
-        // co_yield 0;
-        // co_yield 1;
-        // co_yield 2;
     }
 
     auto to_string_impl(std::ostream& os) const -> void {
@@ -279,10 +438,11 @@ struct LogicQuantifierBinCount : public LogicQuantifierBase<LogicQuantifierBinCo
 };
 
 
-struct LogicQuantifierFace : public LogicQuantifierBase<LogicQuantifierFace> {
-    int length = 0;
+template<int Length>
+struct LogicQuantifierPartition : public LogicQuantifierBase<LogicQuantifierPartition<Length>> {
+    int length;
 
-    LogicQuantifierFace() = default;
+    LogicQuantifierPartition() = default;
 
     auto val() const -> int const& {
         return this->length;
@@ -293,8 +453,7 @@ struct LogicQuantifierFace : public LogicQuantifierBase<LogicQuantifierFace> {
     }
 
     auto static forall_impl() -> generator<int> {
-        constexpr auto kMaxCount = 9;
-        for (int i = 1; i <= kMaxCount; ++i) {
+        for (int i = 1; i <= Length; ++i) {
             co_yield i;
         }
     }
@@ -446,8 +605,10 @@ public:
         return &wl::SmallGraph::all;
     }
     
-
-    auto quantifier_semantics(LogicQuantifierBound const& quantifier, unsigned long long node_i, LogicFormula<LogicQuantifierBound> const& formula) -> bool {
+    template<int MinCount, int MaxCount>
+    auto quantifier_semantics(
+        LogicQuantifierBound<MinCount, MaxCount> const& quantifier, 
+        unsigned long long node_i, LogicFormula<LogicQuantifierBound<MinCount, MaxCount>> const& formula) -> bool {
         auto actual_count = 0;
 
         for (auto &&adj : atp_scope(quantifier)(graph, node_i)) {
@@ -532,16 +693,6 @@ public:
                 return false;
             }
         }
-    }
-
-    auto quantifier_semantics(LogicQuantifierFace const& quantifier, unsigned long long node_i, LogicFormula<LogicQuantifierFace> const& formula) -> bool {
-        // true if there is \psi(a, x_1) & \psi(x_1, x_2) & ... & \psi(x_{l-2}, x_{l-1})
-        // where a and b are the first and last node in the path
-        // and where \psi(x,y) = E(x,y) & \phi(y)
-        // where \phi(c) = \phi(c, x_1) & \phi(x_1, x_2) & ... & \phi(x_{l-1}, c)
-        
-
-
     }
 
     
