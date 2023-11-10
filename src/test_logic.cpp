@@ -31,6 +31,7 @@ auto test_true_(bool cond, std::string code_str, std::string msg = "") {
 using std::make_shared;
 using std::shared_ptr;
 using std::vector;
+using std::array;
 using namespace wl::logic;
 
 
@@ -55,52 +56,52 @@ void test_basics() {
     shared_ptr<ElementBase> fadj = make_shared<Adj>();
     
     test_true( fadj->to_string() == "A" );
-    test_true( fadj->evaluate(g, {0, 1}) );
-    test_false( fadj->evaluate(g, {0, 2}) );
+    test_true( fadj->evaluate(g, 0, 1) );
+    test_false( fadj->evaluate(g, 0, 2) );
 
     shared_ptr<ElementBase> fnonadj = make_shared<NonAdj>();
 
     test_true( fnonadj->to_string() == "~A" );
-    test_false( fnonadj->evaluate(g, {0, 1}) );
-    test_true( fnonadj->evaluate(g, {0, 2}) );
+    test_false( fnonadj->evaluate(g, 0, 1) );
+    test_true( fnonadj->evaluate(g, 0, 2) );
 
     
     shared_ptr<ElementBase> feq = make_shared<Eq>();
 
     test_true( feq->to_string() == "=" );
-    test_true( feq->evaluate(g, {0, 0}) );
-    test_false( feq->evaluate(g, {0, 1}) );
+    test_true( feq->evaluate(g, 0, 0) );
+    test_false( feq->evaluate(g, 0, 1) );
 
 
     shared_ptr<ElementBase> fneq = make_shared<NonEq>();
 
     test_true( fneq->to_string() == "~=" );
-    test_false( fneq->evaluate(g, {0, 0}) );
-    test_true( fneq->evaluate(g, {0, 1}) );
+    test_false( fneq->evaluate(g, 0, 0) );
+    test_true( fneq->evaluate(g, 0, 1) );
 
 
 
-    shared_ptr<ElementBase> fatp = make_shared<And>(vector<shared_ptr<ElementBase>>{fadj, fneq});
+    shared_ptr<ElementBase> fatp = make_shared<And>(fadj, fneq);
 
     test_true( fatp->to_string() == "A&~=" );
-    test_true( fatp->evaluate(g, {0, 1}) );
-    test_false( fatp->evaluate(g, {0, 0}) );
+    test_true( fatp->evaluate(g, 0, 1) );
+    test_false( fatp->evaluate(g, 0, 0) );
 
     
 
-    shared_ptr<ElementBase> ffgt_true = make_shared<Fgt<2, 0, 1>>(vector<shared_ptr<ElementBase>>{ftrue});
+    shared_ptr<ElementBase> ffgt_true = make_shared<Fgt<2, 0, 1>>(ftrue);
 
     test_true( (Fgt<2, 0, 1>::kNumFreeVariables == 2) , "x");
     test_true( ffgt_true->to_string() == "T" );
-    test_true( ffgt_true->evaluate(g, {1, 1}) );
-    test_true( ffgt_true->evaluate(g, {0, 0}) );
-    test_true( ffgt_true->evaluate(g, {0, 1}) );
-    test_true( ffgt_true->evaluate(g, {1, 0}) );
+    test_true( ffgt_true->evaluate(g, 1, 1) );
+    test_true( ffgt_true->evaluate(g, 0, 0) );
+    test_true( ffgt_true->evaluate(g, 0, 1) );
+    test_true( ffgt_true->evaluate(g, 1, 0) );
     
 
-    shared_ptr<ElementBase> ftrue_and_true = make_shared<And>(vector<shared_ptr<ElementBase>>{ffgt_true, ffgt_true});
+    shared_ptr<ElementBase> ftrue_and_true = make_shared<And>(ffgt_true, ffgt_true);
     test_true( ftrue_and_true->to_string() == "T&T" );
-    test_true( ftrue_and_true->evaluate(g, {1, 1}) );
+    test_true( ftrue_and_true->evaluate(g, 1, 1) );
 
 }
 
@@ -113,24 +114,24 @@ void test_quantifier() {
 
 
     shared_ptr<ElementBase> ftrue = make_shared<True>();
-    shared_ptr<ElementBase> ffgt_true = make_shared<Fgt<2, 0, 1>>(vector<shared_ptr<ElementBase>>{ftrue});
+    shared_ptr<ElementBase> ffgt_true = make_shared<Fgt<2, 0, 1>>(ftrue);
 
     {
-        shared_ptr<ElementBase> fexists = make_shared<Exists>(vector<shared_ptr<ElementBase>>{ffgt_true});
+        shared_ptr<ElementBase> fexists = make_shared<Exists>(ffgt_true);
         test_true( fexists->to_string() == "Ex T" );
-        test_true( fexists->evaluate(g, std::array<wl::SmallGraph::vertex_type, 1>{0}) );
+        test_true( fexists->evaluate(g, 0) );
     }
 
     {
-        shared_ptr<ElementBase> fexistcount = make_shared<ExistCount>(3, vector<shared_ptr<ElementBase>>{ffgt_true});
+        shared_ptr<ElementBase> fexistcount = make_shared<ExistCount>(3, ffgt_true);
         test_true( fexistcount->to_string() == "E3x T" );
-        test_true( fexistcount->evaluate(g, std::array<wl::SmallGraph::vertex_type, 1>{0}) );
+        test_true( fexistcount->evaluate(g, 0) );
     }
 
     {
-        shared_ptr<ElementBase> fexistcount = make_shared<ExistCount>(2, vector<shared_ptr<ElementBase>>{ffgt_true});
+        shared_ptr<ElementBase> fexistcount = make_shared<ExistCount>(2, ffgt_true);
         test_true( fexistcount->to_string() == "E2x T" );
-        test_false( fexistcount->evaluate(g, std::array<wl::SmallGraph::vertex_type, 1>{0}) );
+        test_false( fexistcount->evaluate(g, 0) );
     }
 
 }
@@ -140,6 +141,8 @@ void test_quantifier() {
 int main() try {
     test_basics();
     test_quantifier();
+
+    std::cout << "All tests passed.\n";
 
 } catch (std::exception& e) {
     std::cerr << "Exception caught: " << e.what() << "\n";

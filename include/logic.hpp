@@ -90,60 +90,88 @@ struct ElementBase {
 
     ElementBase() = default;
 
-    explicit ElementBase(std::vector<std::shared_ptr<ElementBase>> children) : children(std::move(children)) {}
+    // explicit ElementBase(std::shared_ptr<ElementBase> *children) : children(children) {}
 
 
-    auto evaluate(sigma_struct_t const& s) -> bool {
-        return this->evaluate(s, ElementBase::variable_assignment_t<0>{});
+    template<typename ...VariableAssigment>
+    auto evaluate(sigma_struct_t const& s, VariableAssigment... va) -> bool {
+        return this->evaluate_impl(s, variable_assignment_t<sizeof...(va)>{static_cast<wl::SmallGraph::vertex_type>(va)...});
     }
 
-    virtual auto evaluate(sigma_struct_t const& s, variable_assignment_t<0> const& variable_assignment) -> bool {
+    virtual auto evaluate_impl(sigma_struct_t const& s, variable_assignment_t<0> const& variable_assignment) -> bool {
         throw std::runtime_error("Not implemented (evaluate<0>) for `" + this->to_string() + "`");
         assert(false);
         return false;
     }
 
 
-    virtual auto evaluate(sigma_struct_t const& s, variable_assignment_t<1> const& variable_assignment) -> bool {
+    virtual auto evaluate_impl(sigma_struct_t const& s, variable_assignment_t<1> const& variable_assignment) -> bool {
         throw std::runtime_error("Not implemented (evaluate<1>) for `" + this->to_string() + "`");
         assert(false);
         return false;
     }
 
 
-    virtual auto evaluate(sigma_struct_t const& s, variable_assignment_t<2> const& variable_assignment) -> bool {
+    virtual auto evaluate_impl(sigma_struct_t const& s, variable_assignment_t<2> const& variable_assignment) -> bool {
         throw std::runtime_error("Not implemented (evaluate<2>) for `" + this->to_string() + "`");
         assert(false);
         return false;
     }
 
-    std::vector<std::shared_ptr<ElementBase>> children;
+    // auto get_child(size_t index) const -> std::shared_ptr<ElementBase> const& {
+    //     return children[index];
+    // }
+
+    // auto get_child(size_t index) -> std::shared_ptr<ElementBase>& {
+    //     return children[index];
+    // }
+
+    // std::shared_ptr<ElementBase> *children;
 };
 
-template<uint64_t NumFreeVariables>
+
+template<typename T>
+concept SharedPtrElementBase = std::is_same_v<T, std::shared_ptr<ElementBase>>;
+
+
+
+template<uint64_t NumFreeVariables, uint64_t NumChildren, typename Derived>
 struct FormulaElementBase : public ElementBase {
     using sigma_struct_t = wl::SmallGraph;
     using variable_assignment_t = std::array<wl::SmallGraph::vertex_type, NumFreeVariables>;
     
-    using ElementBase::ElementBase;
+    // using ElementBase::ElementBase;
     
     static constexpr uint64_t kNumFreeVariables = NumFreeVariables;
 
-    FormulaElementBase() = default;
-
-    virtual auto evaluate_impl(sigma_struct_t const&, variable_assignment_t const&) -> bool {
-        throw std::runtime_error("Not implemented (evaluate_impl)");
-        assert(false);
-        return false;
+    FormulaElementBase() {
+        children.fill(nullptr);
     }
 
-    auto evaluate(sigma_struct_t const& s, variable_assignment_t const& variable_assignment) -> bool override {
-        // std::cout << "Evaluate <" << NumFreeVariables << "> " << this->to_string() << std::endl;
+    FormulaElementBase(std::array<std::shared_ptr<ElementBase>, NumChildren> children) : children(std::move(children)) {
+    }
+
+
+    // template<SharedPtrElementBase... Args>
+    // FormulaElementBase(Args&&... args) : children{std::forward<Args>(args)...} {
+    //     static_assert(sizeof...(Args) == NumChildren, "Wrong number of arguments");
+    // }
+    
+
+    // auto evaluate_impl(sigma_struct_t const&, variable_assignment_t const&) -> bool {
+    //     throw std::runtime_error("Not implemented (evaluate_impl)");
+    //     assert(false);
+    //     return false;
+    // }
+
+    auto evaluate_impl(sigma_struct_t const& s, variable_assignment_t const& variable_assignment) -> bool override {
+        // std::cout << "Evaluate Impl <" << NumFreeVariables << "> " << this->to_string() << std::endl;
         if (auto it = evaluation.find(variable_assignment); it != evaluation.end()) {
             return it->second;
         }
 
-        auto result = this->evaluate_impl(s, variable_assignment);
+        // auto result = this->evaluate_impl(s, variable_assignment);
+        auto result = static_cast<Derived*>(this)->evaluate_(s, variable_assignment);
         evaluation[variable_assignment] = result;
         return result;
     }
@@ -153,27 +181,28 @@ struct FormulaElementBase : public ElementBase {
     }
 
     std::unordered_map<variable_assignment_t, bool, hash_array> evaluation;
+    std::array<std::shared_ptr<ElementBase>, NumChildren> children;
 };
 
 
-template<uint64_t NumFreeVariables, typename Derived>
-struct FormulaElement : public FormulaElementBase<NumFreeVariables> {
-    using parent_t = FormulaElementBase<NumFreeVariables>;
-    using variable_assignment_t = typename parent_t::variable_assignment_t;
-    using sigma_struct_t = typename parent_t::sigma_struct_t;
-    // using FormulaElementBase<NumFreeVariables>;
-    static constexpr auto kNumFreeVariables = NumFreeVariables;
+// template<uint64_t NumFreeVariables, uint64_t NumChildren,  typename Derived>
+// struct FormulaElement : public FormulaElementBase<NumFreeVariables, NumChildren> {
+//     using parent_t = FormulaElementBase<NumFreeVariables, NumChildren>;
+//     using variable_assignment_t = typename parent_t::variable_assignment_t;
+//     using sigma_struct_t = typename parent_t::sigma_struct_t;
+//     // using FormulaElementBase<NumFreeVariables>;
+//     static constexpr auto kNumFreeVariables = NumFreeVariables;
 
-    using parent_t::parent_t;
+//     using parent_t::parent_t;
 
-    virtual auto evaluate_impl(sigma_struct_t const& s, variable_assignment_t const& variable_assignment) -> bool override {
-        // std::cout << "Evaluate Impl <" << NumFreeVariables << "> " << this->to_string() << std::endl;
-        return static_cast<Derived*>(this)->evaluate_(s, variable_assignment);
-    }
-};
+//     virtual auto evaluate_impl(sigma_struct_t const& s, variable_assignment_t const& variable_assignment) -> bool override {
+//         // std::cout << "Evaluate Impl <" << NumFreeVariables << "> " << this->to_string() << std::endl;
+//         return static_cast<Derived*>(this)->evaluate_(s, variable_assignment);
+//     }
+// };
 
 
-struct True : public FormulaElement<0, True> {
+struct True : public FormulaElementBase<0, 0, True> {
     auto to_string() const -> std::string override {
         return "T";
     }
@@ -183,7 +212,7 @@ struct True : public FormulaElement<0, True> {
     }
 };
 
-struct False : public FormulaElement<0, False> {
+struct False : public FormulaElementBase<0, 0, False> {
     auto to_string() const -> std::string override {
         return "F";
     }
@@ -194,7 +223,7 @@ struct False : public FormulaElement<0, False> {
 };
 
 
-struct Adj : public FormulaElement<2, Adj> {
+struct Adj : public FormulaElementBase<2, 0, Adj> {
     auto to_string() const -> std::string override {
         return "A";
     }
@@ -206,7 +235,7 @@ struct Adj : public FormulaElement<2, Adj> {
     }
 };
 
-struct NonAdj : public FormulaElement<2, NonAdj> {
+struct NonAdj : public FormulaElementBase<2, 0, NonAdj> {
 
     auto to_string() const -> std::string override {
         return "~A";
@@ -220,7 +249,7 @@ struct NonAdj : public FormulaElement<2, NonAdj> {
 
 };
 
-struct Eq : public FormulaElement<2, Eq> {
+struct Eq : public FormulaElementBase<2, 0, Eq> {
 
     auto to_string() const -> std::string override {
         return "=";
@@ -234,7 +263,7 @@ struct Eq : public FormulaElement<2, Eq> {
 };
 
 
-struct NonEq : public FormulaElement<2, NonEq> {
+struct NonEq : public FormulaElementBase<2, 0, NonEq> {
     
     auto to_string() const -> std::string override {
         return "~=";
@@ -247,54 +276,59 @@ struct NonEq : public FormulaElement<2, NonEq> {
     
 };
 
-struct And : public FormulaElement<2, And> {
+struct And : public FormulaElementBase<2, 2, And> {
 
-    using FormulaElement<2, And>::FormulaElement;
+    using FormulaElementBase<2, 2, And>::FormulaElementBase;
+
+    And(std::shared_ptr<ElementBase> child1, std::shared_ptr<ElementBase> child2) : FormulaElementBase<2, 2, And>({std::move(child1), std::move(child2)}) {}
 
     auto to_string() const -> std::string override {
         return this->children[0]->to_string() + "&" + this->children[1]->to_string();
     }
 
     auto evaluate_(sigma_struct_t const& s, variable_assignment_t const& variable_assignment) -> bool {
-        return this->children[0]->evaluate(s, variable_assignment) && this->children[1]->evaluate(s, variable_assignment);
+        return this->children[0]->evaluate_impl(s, variable_assignment) && this->children[1]->evaluate_impl(s, variable_assignment);
     }
     
 };
 
-struct Or : public FormulaElement<2, Or> {
+struct Or : public FormulaElementBase<2, 2, Or> {
 
-    using FormulaElement<2, Or>::FormulaElement;
+    using FormulaElementBase<2, 2, Or>::FormulaElementBase;
+
+    Or(std::shared_ptr<ElementBase> child1, std::shared_ptr<ElementBase> child2) : FormulaElementBase<2, 2, Or>({std::move(child1), std::move(child2)}) {}
 
     auto to_string() const -> std::string override {
         return this->children[0]->to_string() + "|" + this->children[1]->to_string();
     }
 
     auto evaluate_(sigma_struct_t const& s, variable_assignment_t const& variable_assignment) -> bool {
-        return this->children[0]->evaluate(s, variable_assignment) || this->children[1]->evaluate(s, variable_assignment);
+        return this->children[0]->evaluate_impl(s, variable_assignment) || this->children[1]->evaluate_impl(s, variable_assignment);
     }
     
 };
 
 template<uint64_t NumFreeVariables, uint64_t... Variables>
-struct Fgt : public FormulaElement<NumFreeVariables, Fgt<NumFreeVariables, Variables...>> {
-    using parent_t = FormulaElement<NumFreeVariables, Fgt<NumFreeVariables, Variables...>>;
+struct Fgt : public FormulaElementBase<NumFreeVariables, 1, Fgt<NumFreeVariables, Variables...>> {
+    using parent_t = FormulaElementBase<NumFreeVariables, 1, Fgt<NumFreeVariables, Variables...>>;
     using variable_assignment_t = typename parent_t::variable_assignment_t;
     using sigma_struct_t = typename parent_t::sigma_struct_t;
 
-    using fgt_variable_assignment_t = FormulaElement<NumFreeVariables - sizeof...(Variables), void>::variable_assignment_t;
+    using fgt_variable_assignment_t = FormulaElementBase<NumFreeVariables - sizeof...(Variables), 1, void>::variable_assignment_t;
     
     static_assert(((Variables < NumFreeVariables) && ...) , "Variables must be smaller than NumFreeVariables");
     static_assert(sizeof...(Variables) <= NumFreeVariables, "Too many variables");
 
-
     using parent_t::parent_t;
-    
+
+    explicit Fgt(std::shared_ptr<ElementBase> child) : parent_t({std::move(child)}) {}
+
     auto to_string() const -> std::string override {
         return this->children[0]->to_string();
     }
 
     auto evaluate_(sigma_struct_t const& s, variable_assignment_t const& variable_assignment) -> bool {
-        return this->children[0]->evaluate(s, forget_variables(variable_assignment));
+        return this->children[0]->evaluate_impl(s, forget_variables(variable_assignment));
     }
 
 private:
@@ -312,12 +346,14 @@ private:
 
 
 
-struct Exists : public FormulaElement<1, Exists> {
-    using parent_t = FormulaElement<1, Exists>;
+struct Exists : public FormulaElementBase<1, 1, Exists> {
+    using parent_t = FormulaElementBase<1, 1, Exists>;
     using variable_assignment_t = typename parent_t::variable_assignment_t;
     using sigma_struct_t = typename parent_t::sigma_struct_t;
 
     using parent_t::parent_t;
+
+    explicit Exists(std::shared_ptr<ElementBase> child) : parent_t({std::move(child)}) {}
 
     auto to_string() const -> std::string override {
         return "Ex " + this->children[0]->to_string();
@@ -326,7 +362,7 @@ struct Exists : public FormulaElement<1, Exists> {
     auto evaluate_(sigma_struct_t const& s, variable_assignment_t const& variable_assignment) -> bool {
         auto [v1] = variable_assignment;
         for (auto &&vtx : s.all({})) {
-            if (this->children[0]->evaluate(s, {vtx, v1})) {
+            if (this->children[0]->evaluate(s, vtx, v1)) {
                 return true;
             }
         }
@@ -336,14 +372,14 @@ struct Exists : public FormulaElement<1, Exists> {
 
 
 
-struct ExistCount : public FormulaElement<1, ExistCount> {
-    using parent_t = FormulaElement<1, ExistCount>;
+struct ExistCount : public FormulaElementBase<1, 1, ExistCount> {
+    using parent_t = FormulaElementBase<1, 1, ExistCount>;
     using variable_assignment_t = typename parent_t::variable_assignment_t;
     using sigma_struct_t = typename parent_t::sigma_struct_t;
 
     int count = 0;
 
-    ExistCount(int count, std::vector<std::shared_ptr<ElementBase>> children) : parent_t(std::move(children)), count(count) {}
+    ExistCount(int count, std::shared_ptr<ElementBase> child) : count(count), parent_t({std::move(child)}) {}
 
     auto to_string() const -> std::string override {
         return "E" + std::to_string(count) + "x " + this->children[0]->to_string();
@@ -354,7 +390,7 @@ struct ExistCount : public FormulaElement<1, ExistCount> {
         
         int actual_count = 0;
         for (auto &&vtx : s.all({})) {
-            actual_count += this->children[0]->evaluate(s, {vtx, v1});
+            actual_count += this->children[0]->evaluate(s, vtx, v1);
             if (actual_count > count) {
                 return false;
             }
@@ -366,7 +402,7 @@ struct ExistCount : public FormulaElement<1, ExistCount> {
 
 
 // template<uint64_t NumFreeVariables>
-// struct Atp : public FormulaElement<NumFreeVariables, Atp<NumFreeVariables>> {
+// struct Atp : public FormulaElementBase<NumFreeVariables, Atp<NumFreeVariables>> {
 //     using variable_assignment_t = typename FormulaElementBase<NumFreeVariables>::variable_assignment_t;
 //     using sigma_struct_t = typename FormulaElementBase<NumFreeVariables>::sigma_struct_t;
 
