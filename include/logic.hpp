@@ -12,7 +12,7 @@
 #include <ranges>
 #include <set>
 #include <memory>
-
+#include <concepts>
 
 
 namespace wl {
@@ -119,6 +119,7 @@ struct ElementBase {
         throw std::runtime_error("Not implemented (clear_cache) for `" + this->to_string() + "`");
         assert(false);
     }
+
 };
 
 
@@ -329,18 +330,23 @@ struct Exists : public FormulaElementBase<1, 1, Exists> {
         }
         return false;
     }
+
+    static auto forall(std::shared_ptr<ElementBase> child) -> generator<std::shared_ptr<ElementBase>> {
+        auto quantifier = std::make_shared<Exists>(child);
+        co_yield quantifier;
+    }
 };
 
 
-
-struct ExistCount : public FormulaElementBase<1, 1, ExistCount> {
-    using parent_t = FormulaElementBase<1, 1, ExistCount>;
+template<uint64_t Lo, uint64_t Hi>
+struct ExistCount_ : public FormulaElementBase<1, 1, ExistCount_<Lo, Hi>> {
+    using parent_t = FormulaElementBase<1, 1, ExistCount_<Lo,Hi>>;
     using variable_assignment_t = typename parent_t::variable_assignment_t;
     using sigma_struct_t = typename parent_t::sigma_struct_t;
 
     int count = 0;
 
-    ExistCount(int count, std::shared_ptr<ElementBase> child) : count(count), parent_t({std::move(child)}) {}
+    ExistCount_(int count, std::shared_ptr<ElementBase> child) : count(count), parent_t({std::move(child)}) {}
 
     auto to_string() const -> std::string override {
         return "E" + std::to_string(count) + "x " + this->children[0]->to_string();
@@ -358,32 +364,46 @@ struct ExistCount : public FormulaElementBase<1, 1, ExistCount> {
         }
         return (actual_count == count);
     }
+
+    static auto forall(std::shared_ptr<ElementBase> child) -> generator<std::shared_ptr<ElementBase>> {
+        for (uint64_t i = Lo; i <= Hi; ++i) {
+            auto quantifier = std::make_shared<ExistCount_>(i, child);
+            co_yield quantifier;
+        }
+    }
 };
 
+using ExistCount = ExistCount_<0, 10>;
 
 
-template<uint64_t FreeVarIndex = 0>
-auto generate_formulas(int rank) -> generator<std::shared_ptr<ElementBase>> {
+
+template<uint64_t FreeVarIndex, std::derived_from<ElementBase> Quantifier>
+auto generate_formulas_helper(int rank) -> generator<std::shared_ptr<ElementBase>> {
     if (rank == 0) {
         auto ftrue = std::make_shared<Fgt<1, 0>>(std::make_shared<True>());
         co_yield ftrue;
         co_return;
     } 
 
-    for (auto formula : generate_formulas<(FreeVarIndex+1)%2>(rank - 1)) {
+    for (auto formula : generate_formulas_helper<(FreeVarIndex+1)%2, Quantifier>(rank - 1)) {
         // formula \phi(x_{(FreeVarIndex+1)%2})
 
         // edge
         auto fadj = std::make_shared<Adj>();
         auto fformula = std::make_shared<Fgt<2, FreeVarIndex>>(formula);
-        auto fand = std::make_shared<And>(fadj, formula);
+        auto fand = std::make_shared<And>(fadj, fformula);
 
-        auto quantifier = std::make_shared<Exists>(formula);
-        co_yield quantifier;
+        for (auto &&quantifier : Quantifier::forall(fand)) {
+            co_yield quantifier;
+        }
     }
 
 }
 
+template<std::derived_from<ElementBase> Quantifier>
+auto generate_formulas(int rank) -> generator<std::shared_ptr<ElementBase>> {
+    return generate_formulas_helper<0, Quantifier>(rank);
+}
 
 
 

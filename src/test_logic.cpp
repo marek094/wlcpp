@@ -38,6 +38,25 @@ auto test_true_(bool cond, std::string spec, std::string cond_str, std::source_l
     }
 }
 
+#define test_eq(a, b, ...) EXPAND(test_eq_(a, b, STRINGIZE(a), STRINGIZE(b), std::source_location::current(), ##__VA_ARGS__))
+
+template<typename ValA, typename ValB>
+auto test_eq_(ValA a, ValB b, std::string a_str, std::string b_str, std::source_location location, std::string msg = "") -> void {
+    if (a != b) {
+        std::ostringstream oss;
+        if (! msg.empty()) {
+            oss << " [" << msg << "]: ";
+        }
+        oss << "`test_eq(" << a_str << " aka '" << a << "', ";
+        oss << b_str << " aka '" << b << "')`";
+        oss << " in function `" << location.function_name() << "`";
+        oss << " at " << location.file_name() << ":" << location.line() << ":" << location.column();
+        oss << std::endl;
+        throw std::runtime_error(std::move(oss.str()));
+    }
+}
+
+
 
 using std::make_shared;
 using std::shared_ptr;
@@ -66,27 +85,27 @@ void test_basics() {
 
     shared_ptr<ElementBase> fadj = make_shared<Adj>();
     
-    test_true( fadj->to_string() == "A" );
+    test_eq( fadj->to_string(), "A" );
     test_true( fadj->evaluate(g, 0, 1) );
     test_false( fadj->evaluate(g, 0, 2) );
 
     shared_ptr<ElementBase> fnonadj = make_shared<NonAdj>();
 
-    test_true( fnonadj->to_string() == "~A" );
+    test_eq( fnonadj->to_string(), "~A" );
     test_false( fnonadj->evaluate(g, 0, 1) );
     test_true( fnonadj->evaluate(g, 0, 2) );
 
     
     shared_ptr<ElementBase> feq = make_shared<Eq>();
 
-    test_true( feq->to_string() == "=" );
+    test_eq( feq->to_string(), "=" );
     test_true( feq->evaluate(g, 0, 0) );
     test_false( feq->evaluate(g, 0, 1) );
 
 
     shared_ptr<ElementBase> fneq = make_shared<NonEq>();
 
-    test_true( fneq->to_string() == "~=" );
+    test_eq( fneq->to_string(), "~=" );
     test_false( fneq->evaluate(g, 0, 0) );
     test_true( fneq->evaluate(g, 0, 1) );
 
@@ -94,7 +113,7 @@ void test_basics() {
 
     shared_ptr<ElementBase> fatp = make_shared<And>(fadj, fneq);
 
-    test_true( fatp->to_string() == "A&~=" );
+    test_eq( fatp->to_string(), "A&~=" );
     test_true( fatp->evaluate(g, 0, 1) );
     test_false( fatp->evaluate(g, 0, 0) );
 
@@ -103,7 +122,7 @@ void test_basics() {
     shared_ptr<ElementBase> ffgt_true = make_shared<Fgt<2, 0, 1>>(ftrue);
 
     test_true( (Fgt<2, 0, 1>::kNumFreeVariables == 2) , "x");
-    test_true( ffgt_true->to_string() == "T" );
+    test_eq( ffgt_true->to_string(), "T" );
     test_true( ffgt_true->evaluate(g, 1, 1) );
     test_true( ffgt_true->evaluate(g, 0, 0) );
     test_true( ffgt_true->evaluate(g, 0, 1) );
@@ -133,7 +152,7 @@ void test_quantifier() {
 
     {
         shared_ptr<ElementBase> fexists = make_shared<Exists>(ffgt_true);
-        test_true( fexists->to_string() == "Ex T" );
+        test_eq( fexists->to_string(), "Ex T" );
         test_true( fexists->evaluate(g, 0) );
 
         fexists->clear_cache();
@@ -145,7 +164,7 @@ void test_quantifier() {
 
     {
         shared_ptr<ElementBase> fexistcount = make_shared<ExistCount>(3, ffgt_true);
-        test_true( fexistcount->to_string() == "E3x T" );
+        test_eq( fexistcount->to_string(), "E3x T" );
         test_true( fexistcount->evaluate(g, 0) );
 
         fexistcount->clear_cache();
@@ -157,7 +176,7 @@ void test_quantifier() {
 
     {
         shared_ptr<ElementBase> fexistcount = make_shared<ExistCount>(2, ffgt_true);
-        test_true( fexistcount->to_string() == "E2x T" );
+        test_eq( fexistcount->to_string(), "E2x T" );
         test_false( fexistcount->evaluate(g, 0) );
 
         fexistcount->clear_cache();
@@ -172,15 +191,6 @@ void test_quantifier() {
 
 void test_generators() {
 
-    auto elements = std::vector<shared_ptr<ElementBase>>{};
-    for (auto formula : wl::logic::generate_formulas(1)) {
-        elements.push_back(formula);
-    }
-
-    test_true( elements.size() == 1 );
-    test_true( elements[0]->to_string() == "Ex T" );
-
-
     // K_4
     wl::SmallGraph g;
     g.add_edge(0, 1);
@@ -190,8 +200,44 @@ void test_generators() {
     g.add_edge(1, 3);
     g.add_edge(2, 3);
 
+    {
+        auto elements = std::vector<shared_ptr<ElementBase>>{};
+        for (auto formula : generate_formulas<Exists>(1)) {
+            elements.push_back(formula);
+        }
 
-    test_true( elements[0]->evaluate(g, 0) );
+        test_eq( elements.size(), 1 );
+        test_eq( elements[0]->to_string(), "Ex A&T" );
+        test_true( elements[0]->evaluate(g, 0) );
+
+    }
+
+    {
+        auto elements = std::vector<shared_ptr<ElementBase>>{};
+        for (auto formula : generate_formulas<ExistCount_<0, 4>>(1)) {
+            elements.push_back(formula);
+        }
+
+        test_eq( elements.size(), 5ULL );
+        test_eq( elements[0]->to_string(), "E0x A&T" );
+        test_eq( elements[1]->to_string(), "E1x A&T" );
+        test_eq( elements[2]->to_string(), "E2x A&T" );
+        test_eq( elements[3]->to_string(), "E3x A&T" );
+
+        test_false( elements[0]->evaluate(g, 0) );
+        test_false( elements[1]->evaluate(g, 0) );
+        test_false( elements[2]->evaluate(g, 0) );
+
+        test_true( elements[3]->evaluate(g, 0) );
+        test_true( elements[3]->evaluate(g, 1) );
+        test_true( elements[3]->evaluate(g, 2) );
+        test_true( elements[3]->evaluate(g, 3) );
+
+        test_false( elements[4]->evaluate(g, 0) );
+        test_false( elements[4]->evaluate(g, 1) );
+        test_false( elements[4]->evaluate(g, 2) );
+        test_false( elements[4]->evaluate(g, 3) );
+    }
 
 }
 
