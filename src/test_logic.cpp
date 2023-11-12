@@ -112,6 +112,10 @@ void test_quantifier() {
     g.add_edge(0, 1);
     g.add_edge(1, 2);
 
+    wl::SmallGraph g2;
+    g2.add_edge(0, 1);
+
+    wl::SmallGraph g3;
 
     shared_ptr<ElementBase> ftrue = make_shared<True>();
     shared_ptr<ElementBase> ffgt_true = make_shared<Fgt<2, 0, 1>>(ftrue);
@@ -120,18 +124,36 @@ void test_quantifier() {
         shared_ptr<ElementBase> fexists = make_shared<Exists>(ffgt_true);
         test_true( fexists->to_string() == "Ex T" );
         test_true( fexists->evaluate(g, 0) );
+
+        fexists->clear_cache();
+        test_true( fexists->evaluate(g2, 0) );
+
+        fexists->clear_cache();
+        test_false( fexists->evaluate(g3, 0) );
     }
 
     {
         shared_ptr<ElementBase> fexistcount = make_shared<ExistCount>(3, ffgt_true);
         test_true( fexistcount->to_string() == "E3x T" );
         test_true( fexistcount->evaluate(g, 0) );
+
+        fexistcount->clear_cache();
+        test_false( fexistcount->evaluate(g2, 0) );
+
+        fexistcount->clear_cache();
+        test_false( fexistcount->evaluate(g3, 0) );
     }
 
     {
         shared_ptr<ElementBase> fexistcount = make_shared<ExistCount>(2, ffgt_true);
         test_true( fexistcount->to_string() == "E2x T" );
         test_false( fexistcount->evaluate(g, 0) );
+
+        fexistcount->clear_cache();
+        test_true( fexistcount->evaluate(g2, 0) );
+
+        fexistcount->clear_cache();
+        test_false( fexistcount->evaluate(g3, 0) );
     }
 
 }
