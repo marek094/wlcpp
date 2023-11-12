@@ -6,6 +6,9 @@
 #include <string>
 #include <exception>
 #include <memory>
+#include <source_location>
+#include <map>
+#include <string_view>
 
 
 // Helper macro for correct expansion of __VA_ARGS__
@@ -16,13 +19,21 @@
 #define STRINGIZE2(x) #x
 
 // Updated test_true and test_false macros to include line number
-#define test_true(cond, ...) EXPAND(test_true_(cond, "test_true(" STRINGIZE(cond) ") at line " STRINGIZE(__LINE__), ##__VA_ARGS__))
-#define test_false(cond, ...) EXPAND(test_true_(!cond, "test_false(" STRINGIZE(cond) ") at line " STRINGIZE(__LINE__), ##__VA_ARGS__))
+#define test_val_base(cond, cond_s, spec, ...) EXPAND(test_true_(cond, spec, STRINGIZE(cond_s), std::source_location::current(), ##__VA_ARGS__))
+#define test_true(cond, ...) EXPAND(test_val_base(cond, cond, "true", ##__VA_ARGS__))
+#define test_false(cond, ...) EXPAND(test_val_base(!cond, cond, "false", ##__VA_ARGS__))
 
-auto test_true_(bool cond, std::string code_str, std::string msg = "") {
+
+auto test_true_(bool cond, std::string spec, std::string cond_str, std::source_location location, std::string msg = "") -> void {
     if (! cond) {
         std::ostringstream oss;
-        oss << code_str << " failed." << msg << "\n" << std::flush;
+        if (! msg.empty()) {
+            oss << " [" << msg << "]: ";
+        }
+        oss << "`test_" << spec << "(" << cond_str << ")`";
+        oss << " in function `" << location.function_name() << "`";
+        oss << " at " << location.file_name() << ":" << location.line() << ":" << location.column();
+        oss << std::endl;
         throw std::runtime_error(std::move(oss.str()));
     }
 }
@@ -159,12 +170,67 @@ void test_quantifier() {
 }
 
 
+void test_generators() {
 
-int main() try {
-    test_basics();
-    test_quantifier();
+    auto elements = std::vector<shared_ptr<ElementBase>>{};
+    for (auto formula : wl::logic::generate_formulas(1)) {
+        elements.push_back(formula);
+    }
+
+    test_true( elements.size() == 1 );
+    test_true( elements[0]->to_string() == "Ex T" );
+
+
+    // K_4
+    wl::SmallGraph g;
+    g.add_edge(0, 1);
+    g.add_edge(0, 2);
+    g.add_edge(0, 3);
+    g.add_edge(1, 2);
+    g.add_edge(1, 3);
+    g.add_edge(2, 3);
+
+
+    test_true( elements[0]->evaluate(g, 0) );
+
+}
+
+
+
+
+
+int main(int argc, char** argv) try {
+
+    constexpr auto test_list = std::array{
+        std::pair("basic", test_basics),
+        std::pair("quantifier", test_quantifier),
+        std::pair("generators", test_generators),
+    };
+
+    auto args = std::vector<std::string_view>{argv + 1, argv + argc};
+    
+    if (args.empty()) {
+        for (auto&& [name, test] : test_list) {
+            args.push_back(name);
+        }
+    } 
+    
+    for (auto&& arg : args) {
+        auto it = std::find_if(test_list.begin(), test_list.end(), [&](auto&& p) {
+            return p.first == arg;
+        });
+        if (it == test_list.end()) {
+            std::cerr << "Unknown test: " << arg << "\n";
+            return 1;
+        }
+        auto&& [name, test] = *it;
+        std::cout << "Running test: " << name << "\n";
+        test();
+    }
+
 
     std::cout << "All tests passed.\n";
+    return 0;
 
 } catch (std::exception& e) {
     std::cerr << "Exception caught: " << e.what() << "\n";

@@ -22,12 +22,55 @@ struct hash_array {
     template<typename T, size_t N>
     auto operator()(std::array<T, N> const& arr) const -> size_t {
         size_t seed = arr.size();
-        for (auto &&i : arr) {
+        for (auto&& i : arr) {
             seed ^= i + 0x9e3779b9 + (seed << 6) + (seed >> 2);
         }
         return seed;
     }
 };
+
+
+// template<uint64_t St, uint64_t Nd, uint64_t... Rest>
+// struct is_nondecreasing {
+//     static constexpr bool value = (St <= Nd) && is_nondecreasing<Nd, Rest...>::value;
+// };
+
+
+// template<uint64_t St, uint64_t Nd>
+// struct is_nondecreasing<St, Nd> {
+//     static constexpr bool value = (St <= Nd);
+// };
+
+// template<uint64_t St>
+// struct is_nondecreasing<St> {
+//     static constexpr bool value = true;
+// };
+
+// template<>
+// struct is_nondecreasing<> {
+//     static constexpr bool value = true;
+// };
+
+
+template<uint64_t... Rest>
+struct is_nondecreasing;
+
+template<uint64_t St, uint64_t Nd, uint64_t... Rest>
+struct is_nondecreasing<St, Nd, Rest...> {
+    static constexpr bool value = (St <= Nd) && is_nondecreasing<Nd, Rest...>::value;
+};
+
+template<uint64_t St>
+struct is_nondecreasing<St> {
+    static constexpr bool value = true;
+};
+
+template<>
+struct is_nondecreasing<> {
+    static constexpr bool value = true;
+};
+
+
 
 
 
@@ -235,6 +278,7 @@ struct Fgt : public FormulaElementBase<NumFreeVariables, 1, Fgt<NumFreeVariables
     
     static_assert(((Variables < NumFreeVariables) && ...) , "Variables must be smaller than NumFreeVariables");
     static_assert(sizeof...(Variables) <= NumFreeVariables, "Too many variables");
+    static_assert(is_nondecreasing<Variables...>::value, "Variables must be in nondecreasing order");
 
     using parent_t::parent_t;
 
@@ -315,6 +359,31 @@ struct ExistCount : public FormulaElementBase<1, 1, ExistCount> {
         return (actual_count == count);
     }
 };
+
+
+
+template<uint64_t FreeVarIndex = 0>
+auto generate_formulas(int rank) -> generator<std::shared_ptr<ElementBase>> {
+    if (rank == 0) {
+        auto ftrue = std::make_shared<Fgt<1, 0>>(std::make_shared<True>());
+        co_yield ftrue;
+        co_return;
+    } 
+
+    for (auto formula : generate_formulas<(FreeVarIndex+1)%2>(rank - 1)) {
+        // formula \phi(x_{(FreeVarIndex+1)%2})
+
+        // edge
+        auto fadj = std::make_shared<Adj>();
+        auto fformula = std::make_shared<Fgt<2, FreeVarIndex>>(formula);
+        auto fand = std::make_shared<And>(fadj, formula);
+
+        auto quantifier = std::make_shared<Exists>(formula);
+        co_yield quantifier;
+    }
+
+}
+
 
 
 
