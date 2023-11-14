@@ -24,20 +24,25 @@ int main(int argc, char* argv[]) {
         omp_set_num_threads(std::atoi(argv[2]));
     }
 
-    int rank = 0;
+    int seed = 42;
     if (argc >= 4) {
-        rank = std::atoi(argv[3]);
-    }
-    
-    size_t limit = -1;
-    if (argc >= 5) {
-        limit = std::atoi(argv[3]);
+        seed = std::atoi(argv[3]);
     }
 
+    int rank = 0;
+    // if (argc >= 4) {
+    //     rank = std::atoi(argv[3]);
+    // }
+    
+    size_t limit = -1;
+    // if (argc >= 5) {
+    //     limit = std::atoi(argv[3]);
+    // }
+
     size_t skip = 0;
-    if (argc >= 6) {
-        skip = std::atoi(argv[4]);
-    }
+    // if (argc >= 6) {
+    //     skip = std::atoi(argv[4]);
+    // }
 
 
     std::filesystem::path file_path = argv[1];
@@ -63,7 +68,7 @@ int main(int argc, char* argv[]) {
         using namespace std;
 
 
-        auto construct_logical_system = [] {
+        auto construct_logical_system = [seed] {
             auto f = std::map<std::string, shared_ptr<ElementBase>>{};
 
             f["true"] = make_shared<Fgt<1, 0>>(make_shared<True>());
@@ -91,17 +96,17 @@ int main(int argc, char* argv[]) {
 
             
             // randomly select element from f
-            auto rand_gen = mt19937(42);
-            for (int i = 0; i < 1000; ++i) {
+            auto rand_gen = mt19937(seed);
+            for (int i = 0; i < 100; ++i) {
                 auto children = AtomicQuantifier::ChildrenArray{adj_};
                 for (int c = 0; c <= 200; ++c) {
                     auto it = f.begin();
                     std::advance(it, rand_gen() % f.size());
                     children.push_back(it->second);
-                    if (children.size() % 10 == 9) {
+                    // if (children.size() % 10 == 9) {
                         f["rand[" + to_string(i) + ", " + to_string(c) + "]"
                             ] = make_shared<AtomicQuantifier>(children);
-                    }
+                    // }
                 }
             }
 
@@ -156,7 +161,10 @@ int main(int argc, char* argv[]) {
             // std::cout << oss.str();
             if (counts[0] != counts[1]) {
                 std::cout << "Counts: " << counts[0] << " " << counts[1] << "\n";
-                // std::cout << oss.str();
+                std::cout << name << "\t";
+                // phi->to_ostream(std::cout) << "\n";
+
+
             }
 
             j += 1;

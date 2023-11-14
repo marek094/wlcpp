@@ -81,6 +81,11 @@ constexpr uint64_t Dymanic = ~0ULL;
 struct ElementBase {
     virtual auto to_string() const -> std::string = 0;
 
+    virtual auto to_ostream(std::ostream& os) const -> std::ostream& {
+        os << this->to_string();
+        return os;
+    }
+
     using sigma_struct_t = wl::SmallGraph;
 
     template<uint64_t NumFreeVariables>
@@ -325,6 +330,11 @@ struct Exists : public FormulaElementBase<1, 1, Exists> {
         return "Ex " + this->children[0]->to_string();
     }
 
+    auto to_ostream(std::ostream& os) const -> std::ostream& override {
+        os << "Ex ";
+        return this->children[0]->to_ostream(os);
+    }
+
     auto evaluate_(sigma_struct_t const& s, variable_assignment_t const& variable_assignment) -> bool {
         auto [v1] = variable_assignment;
         for (auto &&vtx : s.all({})) {
@@ -356,6 +366,11 @@ struct ExistCount_ : public FormulaElementBase<1, 1, ExistCount_<Lo, Hi>> {
 
     auto to_string() const -> std::string override {
         return "E" + std::to_string(count) + "x " + this->children[0]->to_string();
+    }
+
+    auto to_ostream(std::ostream& os) const -> std::ostream& override {
+        os << "E" << count << "x ";
+        return this->children[0]->to_ostream(os);
     }
 
     auto evaluate_(sigma_struct_t const& s, variable_assignment_t const& variable_assignment) -> bool {
@@ -393,7 +408,7 @@ struct AtomicQuantifier : public FormulaElementBase<1, Dymanic, AtomicQuantifier
 
     auto to_string() const -> std::string override {
         std::ostringstream oss;
-        oss << "P" << std::to_string(this->children.size()-1) << "x";
+        oss << "P" << (this->children.size()-1) << "x";
         if (this->children.size() >= 1) {
             oss << " " << this->children[0]->to_string() << "->";
             oss << "(";
@@ -408,6 +423,25 @@ struct AtomicQuantifier : public FormulaElementBase<1, Dymanic, AtomicQuantifier
         return std::move(oss.str());
     }
 
+    auto to_ostream(std::ostream& os) const -> std::ostream& override {
+        os << "P" << (this->children.size()-1) << "x";
+        if (this->children.size() >= 1) {
+            os << " ";
+            this->children[0]->to_ostream(os);
+            os << "->";
+            os << "(";
+            for (int i = 1; i < this->children.size(); ++i) {
+                this->children[i]->to_ostream(os);
+                if (i < this->children.size()-1) {
+                    os << ",";
+                }
+            }
+            os << ")";
+        }
+        return os;
+    }
+
+
     auto evaluate_(sigma_struct_t const& s, variable_assignment_t const& variable_assignment) -> bool {
         auto [v1] = variable_assignment;
         assert (this->children.size() >= 1);
@@ -415,7 +449,7 @@ struct AtomicQuantifier : public FormulaElementBase<1, Dymanic, AtomicQuantifier
 
         int64_t wanted_c = this->children.size()-1;
 
-        int c_sum = 0;
+        int64_t c_sum = 0;
         for (auto &&vtx : s.all({})) {
             if (atomic->evaluate(s, vtx, v1)) {
                 bool is_disjunction = false;
