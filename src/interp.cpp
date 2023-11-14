@@ -10,6 +10,8 @@
 #include <vector>
 #include <iomanip>
 #include <map>
+#include <random>
+#include <chrono>
 
 int main(int argc, char* argv[]) {
 
@@ -59,56 +61,77 @@ int main(int argc, char* argv[]) {
     {
         using namespace wl::logic;
         using namespace std;
-        auto f = std::map<std::string, shared_ptr<ElementBase>>{};
-
-        // auto x = make_shared<Adj>();
-        // auto y = make_shared<And>(x, make_shared<Fgt<2, 0, 1>>(make_shared<True>()));
 
 
-        f["true"] = make_shared<Fgt<1, 0>>(make_shared<True>());
-        f["false"] = make_shared<Fgt<1, 0>>(make_shared<False>());
-        auto adj_ = make_shared<Adj>();
+        auto construct_logical_system = [] {
+            auto f = std::map<std::string, shared_ptr<ElementBase>>{};
 
-        constexpr int max_c = 30;
-        constexpr int max_l = 4;
+            f["true"] = make_shared<Fgt<1, 0>>(make_shared<True>());
+            f["false"] = make_shared<Fgt<1, 0>>(make_shared<False>());
+            auto adj_ = make_shared<Adj>();
 
-        {
-            auto childrenl1 = AtomicQuantifier::ChildrenArray{adj_, f["true"]};
-            for (int c = 1; c <= max_c; ++c) {
-                f["phi_l1c" + to_string(c)] = make_shared<AtomicQuantifier>(childrenl1);
-                childrenl1.push_back(f["false"]);
+            constexpr int max_c = 100;
+            constexpr int max_l = 3;
+
+            {
+                auto childrenl1 = AtomicQuantifier::ChildrenArray{adj_, f["true"]};
+                for (int c = 1; c <= max_c; ++c) {
+                    f["phi_l1c" + to_string(c)] = make_shared<AtomicQuantifier>(childrenl1);
+                    childrenl1.push_back(f["false"]);
+                }
             }
-        }
 
-        for (int l = 2; l <= max_l; ++l) {
-            auto childrenl2 = AtomicQuantifier::ChildrenArray{adj_};
-            for (int c = 1; c <= max_c; ++c) {
-                childrenl2.push_back(f["phi_l" + to_string(l-1) + "c" + to_string(c)]);
-                f["phi_l" + to_string(l) + "c" + to_string(c)] = make_shared<AtomicQuantifier>(childrenl2);
+            for (int l = 2; l <= max_l; ++l) {
+                auto childrenl2 = AtomicQuantifier::ChildrenArray{adj_};
+                for (int c = 1; c <= max_c; ++c) {
+                    childrenl2.push_back(f["phi_l" + to_string(l-1) + "c" + to_string(c)]);
+                    f["phi_l" + to_string(l) + "c" + to_string(c)] = make_shared<AtomicQuantifier>(childrenl2);
+                }
             }
-        }
-    
 
-        auto&& elements = f;
+            
+            // randomly select element from f
+            auto rand_gen = mt19937(42);
+            for (int i = 0; i < 1000; ++i) {
+                auto children = AtomicQuantifier::ChildrenArray{adj_};
+                for (int c = 0; c <= 200; ++c) {
+                    auto it = f.begin();
+                    std::advance(it, rand_gen() % f.size());
+                    children.push_back(it->second);
+                    if (children.size() % 10 == 9) {
+                        f["rand[" + to_string(i) + ", " + to_string(c) + "]"
+                            ] = make_shared<AtomicQuantifier>(children);
+                    }
+                }
+            }
+
+            return f;
+        };
+
+
+        // auto start_time = std::chrono::steady_clock::now();
+
+        auto elements = construct_logical_system();
+        
+        std::cout << "Constructed logical system with " << elements.size() << " elements.\n";
+        std::cout << std::string(30, '=') << "\n";
+
         auto results = std::vector< std::vector< std::vector<bool>>>(elements.size(), std::vector<std::vector<bool>>(graph_list.size()));
 
-        int i = 0;
-        for (auto&& graph : graph_list) {
-            std::cout << "\nGraph " << i << std::endl;
+        #pragma omp parallel for
+        for (int i = 0; i < graph_list.size(); ++i) {
+            auto&& graph = graph_list[i]; 
+            std::cout << "Graph " << i << std::endl;
             int j = 0;
-            for (auto&& [name, phi] : elements) {
+
+            for (auto&& [name, phi] : construct_logical_system()) { // the cache is not used
                 for (int node_i = 0; node_i < graph.number_of_vertices(); ++node_i) {
                     results[j][i].push_back(phi->evaluate(graph, node_i));
                 }
-                // phi->clear_cache();
                 j += 1;
             }
+            std::cout << "Graph " << i << " done\n";
 
-            for (auto&& [name, phi] : elements) {
-                phi->clear_cache();
-            }
-
-            i += 1;
         }
 
 
@@ -116,28 +139,32 @@ int main(int argc, char* argv[]) {
         // for (int j = 0; j < elements.size(); ++j) {
         int j = 0;
         for (auto &&[name, phi] : elements) {
-            std::ostringstream oss;
+            // std::ostringstream oss;
             auto counts = std::array<int, 2>{};
             for (int i = 0; i < graph_list.size(); ++i) {
                 for (int k = 0; k < graph_list[i].number_of_vertices(); ++k) {
                     // if (graph) {
-                        oss << name << "\t";
-                        oss << "Graph " << std::setw(2) << i << "   Node " << std::setw(2) << k << "   ";
-                        oss << phi->to_string() << "\t" << results[j][i][k] << " ";
-                        oss << "\n";
+                        // oss << name << "\t";
+                        // oss << "Graph " << std::setw(2) << i << "   Node " << std::setw(2) << k << "   ";
+                        // oss << phi->to_string() << "\t" << results[j][i][k] << " ";
+                        // oss << "\n";
                     // }
                     counts[i] += results[j][i][k];
                 }
             }
-            oss << "Counts: " << counts[0] << " " << counts[1] << "\n";
 
             // std::cout << oss.str();
             if (counts[0] != counts[1]) {
-                std::cout << oss.str();
+                std::cout << "Counts: " << counts[0] << " " << counts[1] << "\n";
+                // std::cout << oss.str();
             }
 
             j += 1;
         }
+
+        std::cout << std::string(30, '=') << "\nBIG FAT DONE\n" << std::endl;
+
+
 
         // std::cout << std::endl;
         // for (int i = 0; i < graph_list.size(); ++i) {
