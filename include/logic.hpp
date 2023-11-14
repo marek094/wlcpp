@@ -13,7 +13,7 @@
 #include <set>
 #include <memory>
 #include <concepts>
-
+#include <iomanip>
 
 namespace wl {
 
@@ -418,17 +418,25 @@ struct AtomicQuantifier : public FormulaElementBase<1, Dymanic, AtomicQuantifier
         int c_sum = 0;
         for (auto &&vtx : s.all({})) {
             if (atomic->evaluate(s, vtx, v1)) {
+                bool is_disjunction = false;
                 for (int ci = 1; ci < this->children.size(); ++ci) {
                     if (this->children[ci]->evaluate(s, vtx)) {
+                        is_disjunction = true;
                         c_sum += ci;
                         if (c_sum > wanted_c) {
+                            // std::cout << "false" << "\t" <<std::setw(2)<< (int)v1 << " (c_sum  > wanted_c) " << this->to_string() << " " << c_sum << " > " << wanted_c << std::endl;
                             return false;
                         }
                     }
                 }
+                if (!is_disjunction) {
+                    // std::cout << "false" << "\t" <<std::setw(2)<< (int)v1 << " (!is_disjunction) " << this->to_string() << std::endl;
+                    return false;
+                }
             }
         }
 
+        // std::cout << std::boolalpha << (c_sum == wanted_c) << "\t" << std::setw(2) << (int)v1 << " (c_sum == wanted_c) " << this->to_string() << " " << c_sum << " == " << wanted_c << std::endl;
         return (c_sum == wanted_c);
     }
 
