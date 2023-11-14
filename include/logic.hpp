@@ -76,7 +76,7 @@ struct is_nondecreasing<> {
 
 namespace logic {
 
-
+constexpr uint64_t Dymanic = ~0ULL;
 
 struct ElementBase {
     virtual auto to_string() const -> std::string = 0;
@@ -130,11 +130,15 @@ struct FormulaElementBase : public ElementBase {
 
     static constexpr uint64_t kNumFreeVariables = NumFreeVariables;
 
+    using ChildrenArray = std::conditional_t<NumChildren == Dymanic, 
+        std::vector<std::shared_ptr<ElementBase>>, 
+        std::array<std::shared_ptr<ElementBase>, NumChildren>>;
+
     FormulaElementBase() {
         children.fill(nullptr);
     }
 
-    FormulaElementBase(std::array<std::shared_ptr<ElementBase>, NumChildren> children) : children(std::move(children)) {
+    FormulaElementBase(ChildrenArray children) : children(std::move(children)) {
     }
 
     auto evaluate_impl(sigma_struct_t const& s, variable_assignment_t const& variable_assignment) -> bool override {
@@ -159,7 +163,7 @@ struct FormulaElementBase : public ElementBase {
     }
 
     std::unordered_map<variable_assignment_t, bool, hash_array> evaluation;
-    std::array<std::shared_ptr<ElementBase>, NumChildren> children;
+    ChildrenArray children;
 };
 
 
@@ -331,8 +335,8 @@ struct Exists : public FormulaElementBase<1, 1, Exists> {
         return false;
     }
 
-    static auto forall(std::shared_ptr<ElementBase> child) -> generator<std::shared_ptr<ElementBase>> {
-        auto quantifier = std::make_shared<Exists>(child);
+    static auto forall(parent_t::ChildrenArray children) -> generator<std::shared_ptr<ElementBase>> {
+        auto quantifier = std::make_shared<Exists>(std::move(children));
         co_yield quantifier;
     }
 };
@@ -347,6 +351,8 @@ struct ExistCount_ : public FormulaElementBase<1, 1, ExistCount_<Lo, Hi>> {
     int count = 0;
 
     ExistCount_(int count, std::shared_ptr<ElementBase> child) : count(count), parent_t({std::move(child)}) {}
+
+    ExistCount_(int count, parent_t::ChildrenArray children) : count(count), parent_t(std::move(children)) {}
 
     auto to_string() const -> std::string override {
         return "E" + std::to_string(count) + "x " + this->children[0]->to_string();
@@ -365,9 +371,9 @@ struct ExistCount_ : public FormulaElementBase<1, 1, ExistCount_<Lo, Hi>> {
         return (actual_count == count);
     }
 
-    static auto forall(std::shared_ptr<ElementBase> child) -> generator<std::shared_ptr<ElementBase>> {
+    static auto forall(parent_t::ChildrenArray children) -> generator<std::shared_ptr<ElementBase>> {
         for (uint64_t i = Lo; i <= Hi; ++i) {
-            auto quantifier = std::make_shared<ExistCount_>(i, child);
+            auto quantifier = std::make_shared<ExistCount_>(i, children);
             co_yield quantifier;
         }
     }
@@ -376,27 +382,125 @@ struct ExistCount_ : public FormulaElementBase<1, 1, ExistCount_<Lo, Hi>> {
 using ExistCount = ExistCount_<0, 10>;
 
 
+struct AtomicQuantifier : public FormulaElementBase<1, Dymanic, AtomicQuantifier> {
+    using parent_t = FormulaElementBase<1, Dymanic, AtomicQuantifier>;
+    using variable_assignment_t = typename parent_t::variable_assignment_t;
+    using sigma_struct_t = typename parent_t::sigma_struct_t;
+
+    explicit AtomicQuantifier(parent_t::ChildrenArray children) : parent_t(std::move(children)) {
+        assert (this->children.size() >= 1);
+    }
+
+    auto to_string() const -> std::string override {
+        std::ostringstream oss;
+        oss << "P" << std::to_string(this->children.size()-1) << "x";
+        if (this->children.size() >= 1) {
+            oss << " " << this->children[0]->to_string() << "->";
+            oss << "(";
+            for (int i = 1; i < this->children.size(); ++i) {
+                oss << this->children[i]->to_string();
+                if (i < this->children.size()-1) {
+                    oss << ",";
+                }
+            }
+            oss << ")";
+        }
+        return std::move(oss.str());
+    }
+
+    auto evaluate_(sigma_struct_t const& s, variable_assignment_t const& variable_assignment) -> bool {
+        auto [v1] = variable_assignment;
+        assert (this->children.size() >= 1);
+        auto&& atomic = this->children.front();
+
+        int64_t wanted_c = this->children.size()-1;
+
+        int c_sum = 0;
+        for (auto &&vtx : s.all({})) {
+            if (atomic->evaluate(s, vtx, v1)) {
+                for (int ci = 1; ci < this->children.size(); ++ci) {
+                    if (this->children[ci]->evaluate(s, vtx)) {
+                        c_sum += ci;
+                        if (c_sum > wanted_c) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        return (c_sum == wanted_c);
+    }
+
+    static auto forall(parent_t::ChildrenArray children) -> generator<std::shared_ptr<ElementBase>> {
+        // auto&& atomic = children.front();
+        // for (uint64_t subset = 1; subset < (1ULL<<(children.size())); ++subset) {
+        //     std::cout << "\nf\t" << children.size() << "\t" << subset  << std::endl;   
+        //     auto children2 = parent_t::ChildrenArray{};
+        //     children2.push_back(atomic);
+        //     for (uint64_t i = 1; i < children.size(); ++i) {
+        //         if (subset & (1ULL << (i-1))) {
+        //             children2.push_back(children[i]);
+        //         }
+        //     }
+        //     std::shared_ptr<ElementBase> result = std::make_shared<AtomicQuantifier>(children2);
+        //     std::cout << "\nff\t" << children2.size() << "\t" << result->to_string() <<  std::endl;
+        //     co_yield result;
+        // }
+
+        for (uint64_t subset_size = 2; subset_size <= children.size(); ++subset_size) {
+            co_yield std::make_shared<AtomicQuantifier>(parent_t::ChildrenArray{children.begin(), children.begin()+subset_size});
+        }
+    }
+};
+
+
 
 template<uint64_t FreeVarIndex, std::derived_from<ElementBase> Quantifier>
 auto generate_formulas_helper(int rank) -> generator<std::shared_ptr<ElementBase>> {
     if (rank == 0) {
-        auto ftrue = std::make_shared<Fgt<1, 0>>(std::make_shared<True>());
-        co_yield ftrue;
+        co_yield std::make_shared<Fgt<1, 0>>(std::make_shared<True>());
+        co_yield std::make_shared<Fgt<1, 0>>(std::make_shared<False>());
         co_return;
-    } 
-
-    for (auto formula : generate_formulas_helper<(FreeVarIndex+1)%2, Quantifier>(rank - 1)) {
-        // formula \phi(x_{(FreeVarIndex+1)%2})
-
-        // edge
-        auto fadj = std::make_shared<Adj>();
-        auto fformula = std::make_shared<Fgt<2, FreeVarIndex>>(formula);
-        auto fand = std::make_shared<And>(fadj, fformula);
-
-        for (auto &&quantifier : Quantifier::forall(fand)) {
-            co_yield quantifier;
-        }
     }
+
+    
+    auto all_formulas = std::vector<std::shared_ptr<ElementBase>>{};
+    all_formulas.push_back(std::make_shared<Adj>());
+
+    for (auto&& formula : generate_formulas_helper<(FreeVarIndex+1)%2, Quantifier>(rank - 1)) {
+        all_formulas.push_back(formula);
+    }
+
+    for (auto&& formula : Quantifier::forall(all_formulas)) {
+        co_yield formula;
+    }
+
+    // if (rank == 3) {
+    //     std::cout << "Z" << all_formulas.size() << std::endl;
+    //     all_formulas.erase(all_formulas.begin()+10, all_formulas.end());
+    //     for (auto&& formula : Quantifier::forall(all_formulas)) {
+    //         std::cout << "R\t" << formula->to_string() << std::endl;
+    //     }
+    // }
+
+
+    // for (auto&& formula : all_formulas) {
+        
+    //     co_yield formula;
+
+    //     // edge
+    //     auto fadj = std::make_shared<Adj>();
+    //     auto fformula = std::make_shared<Fgt<2, FreeVarIndex>>(formula);
+    //     auto fand = std::make_shared<And>(fadj, fformula);
+
+    //     auto children = typename Quantifier::ChildrenArray{fand};
+    //     assert( children.size() == 1);
+    //     assert( children.front() != nullptr);
+    //     for (auto quantifier : Quantifier::forall(children)) {
+    //         co_yield quantifier;
+    //     }
+    // }
 
 }
 
@@ -404,7 +508,6 @@ template<std::derived_from<ElementBase> Quantifier>
 auto generate_formulas(int rank) -> generator<std::shared_ptr<ElementBase>> {
     return generate_formulas_helper<0, Quantifier>(rank);
 }
-
 
 
 } // namespace logic

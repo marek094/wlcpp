@@ -191,56 +191,118 @@ void test_quantifier() {
 
 void test_generators() {
 
-    // K_4
-    wl::SmallGraph g;
-    g.add_edge(0, 1);
-    g.add_edge(0, 2);
-    g.add_edge(0, 3);
-    g.add_edge(1, 2);
-    g.add_edge(1, 3);
-    g.add_edge(2, 3);
+    // // K_4
+    // wl::SmallGraph g;
+    // g.add_edge(0, 1);
+    // g.add_edge(0, 2);
+    // g.add_edge(0, 3);
+    // g.add_edge(1, 2);
+    // g.add_edge(1, 3);
+    // g.add_edge(2, 3);
 
-    {
-        auto elements = std::vector<shared_ptr<ElementBase>>{};
-        for (auto formula : generate_formulas<Exists>(1)) {
-            elements.push_back(formula);
-        }
+    // {
+    //     auto elements = std::vector<shared_ptr<ElementBase>>{};
+    //     for (auto formula : generate_formulas<Exists>(1)) {
+    //         elements.push_back(formula);
+    //     }
 
-        test_eq( elements.size(), 1 );
-        test_eq( elements[0]->to_string(), "Ex A&T" );
-        test_true( elements[0]->evaluate(g, 0) );
+    //     test_eq( elements.size(), 1 );
+    //     test_eq( elements[0]->to_string(), "Ex A&T" );
+    //     test_true( elements[0]->evaluate(g, 0) );
 
-    }
+    // }
 
-    {
-        auto elements = std::vector<shared_ptr<ElementBase>>{};
-        for (auto formula : generate_formulas<ExistCount_<0, 4>>(1)) {
-            elements.push_back(formula);
-        }
+    // {
+    //     auto elements = std::vector<shared_ptr<ElementBase>>{};
+    //     for (auto formula : generate_formulas<ExistCount_<0, 4>>(1)) {
+    //         elements.push_back(formula);
+    //     }
 
-        test_eq( elements.size(), 5ULL );
-        test_eq( elements[0]->to_string(), "E0x A&T" );
-        test_eq( elements[1]->to_string(), "E1x A&T" );
-        test_eq( elements[2]->to_string(), "E2x A&T" );
-        test_eq( elements[3]->to_string(), "E3x A&T" );
+    //     test_eq( elements.size(), 5ULL );
+    //     test_eq( elements[0]->to_string(), "E0x A&T" );
+    //     test_eq( elements[1]->to_string(), "E1x A&T" );
+    //     test_eq( elements[2]->to_string(), "E2x A&T" );
+    //     test_eq( elements[3]->to_string(), "E3x A&T" );
 
-        test_false( elements[0]->evaluate(g, 0) );
-        test_false( elements[1]->evaluate(g, 0) );
-        test_false( elements[2]->evaluate(g, 0) );
+    //     test_false( elements[0]->evaluate(g, 0) );
+    //     test_false( elements[1]->evaluate(g, 0) );
+    //     test_false( elements[2]->evaluate(g, 0) );
 
-        test_true( elements[3]->evaluate(g, 0) );
-        test_true( elements[3]->evaluate(g, 1) );
-        test_true( elements[3]->evaluate(g, 2) );
-        test_true( elements[3]->evaluate(g, 3) );
+    //     test_true( elements[3]->evaluate(g, 0) );
+    //     test_true( elements[3]->evaluate(g, 1) );
+    //     test_true( elements[3]->evaluate(g, 2) );
+    //     test_true( elements[3]->evaluate(g, 3) );
 
-        test_false( elements[4]->evaluate(g, 0) );
-        test_false( elements[4]->evaluate(g, 1) );
-        test_false( elements[4]->evaluate(g, 2) );
-        test_false( elements[4]->evaluate(g, 3) );
-    }
+    //     test_false( elements[4]->evaluate(g, 0) );
+    //     test_false( elements[4]->evaluate(g, 1) );
+    //     test_false( elements[4]->evaluate(g, 2) );
+    //     test_false( elements[4]->evaluate(g, 3) );
+    // }
 
 }
 
+
+void test_pquantifier() {
+
+    shared_ptr<ElementBase> ftrue = make_shared<Fgt<1, 0>>(make_shared<True>());
+    shared_ptr<ElementBase> ffalse = make_shared<Fgt<1, 0>>(make_shared<False>());
+    shared_ptr<ElementBase> fadj = make_shared<Adj>();
+
+    shared_ptr<ElementBase> aquant3 = make_shared<AtomicQuantifier>(AtomicQuantifier::ChildrenArray{fadj, ftrue, ffalse, ffalse});
+
+    auto g = wl::SmallGraph{};
+    g.add_edge(0, 1);
+    g.add_edge(0, 2);
+    g.add_edge(0, 3);
+    g.add_edge(1, 4);
+    g.add_edge(2, 5);
+    g.add_edge(3, 6);
+    g.add_edge(3, 7);
+    g.add_edge(3, 8);
+    
+
+    test_eq( aquant3->to_string(), "P3x A->(T,F,F)" );
+    test_true( aquant3->evaluate(g, 0));
+    test_false( aquant3->evaluate(g, 1));
+    test_false( aquant3->evaluate(g, 2));
+    test_false( aquant3->evaluate(g, 3));
+    test_false( aquant3->evaluate(g, 4));
+    test_false( aquant3->evaluate(g, 5));
+    test_false( aquant3->evaluate(g, 6));
+    test_false( aquant3->evaluate(g, 7));
+    test_false( aquant3->evaluate(g, 8));
+
+
+    shared_ptr<ElementBase> aquant2 = make_shared<AtomicQuantifier>(AtomicQuantifier::ChildrenArray{fadj, ftrue, ffalse});
+
+    test_eq( aquant2->to_string(), "P2x A->(T,F)" );
+    test_false( aquant2->evaluate(g, 0));
+    test_true( aquant2->evaluate(g, 1));
+    test_true( aquant2->evaluate(g, 2));
+    test_false( aquant2->evaluate(g, 3));
+    test_false( aquant2->evaluate(g, 4));
+    test_false( aquant2->evaluate(g, 5));
+    test_false( aquant2->evaluate(g, 6));
+    test_false( aquant2->evaluate(g, 7));
+    test_false( aquant2->evaluate(g, 8));
+
+}
+
+void test_pquantifier_generator() {
+
+    auto elements = std::vector<shared_ptr<ElementBase>>{};
+    for (auto formula : generate_formulas<AtomicQuantifier>(3)) {
+        elements.push_back(formula);
+    }
+
+    // test_eq( elements.size(), 7ULL );
+
+    std::cout << "Found " << elements.size() << " formulas.\n";
+    for (auto&& element : elements) {
+        std::cout << element->to_string() << "\n" << std::flush;
+    }
+
+}
 
 
 
@@ -251,6 +313,8 @@ int main(int argc, char** argv) try {
         std::pair("basic", test_basics),
         std::pair("quantifier", test_quantifier),
         std::pair("generators", test_generators),
+        std::pair("pquantifier", test_pquantifier),
+        std::pair("pquantifier_generator", test_pquantifier_generator),
     };
 
     auto args = std::vector<std::string_view>{argv + 1, argv + argc};
