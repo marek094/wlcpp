@@ -29,7 +29,7 @@
 
 #include <vector>
 #include <utility>
-
+#include <complex>
 
 namespace wl {
 
@@ -104,6 +104,98 @@ auto compute_path_homvec(SmallGraph graph, SmallGraph::type num_vertices) -> std
 
     return homvector;
 }
+
+
+auto compute_complex_path_homvec(SmallGraph graph, SmallGraph::type num_vertices, long long sign = 1) -> std::vector<std::complex<long long>> {
+    auto A = graph.to_adjacency_matrix();
+
+    using complex_matrix_t = Eigen::Matrix<std::complex<int64_t>, Eigen::Dynamic, Eigen::Dynamic>;
+
+    // A to complex<uint64_t>
+    complex_matrix_t Ai = A.cast<std::complex<int64_t>>();
+    assert (Ai.rows() == Ai.cols());
+    for (int i = 0; i < Ai.rows(); ++i) {
+        Ai(i, i) = std::complex<int64_t>(0, sign*1);
+    }
+
+    std::vector<std::complex<long long>> homvector;
+    homvector.reserve(num_vertices+1);
+    
+    complex_matrix_t product = complex_matrix_t::Identity(Ai.rows(), Ai.cols());
+    homvector.push_back(product.sum());
+    for (int n = 0; n < num_vertices; ++n) {
+        product = product * Ai;
+        homvector.push_back(product.sum());
+    }
+
+    return homvector;
+}
+
+
+auto compute_complex_path_homvec_boost(SmallGraph graph, SmallGraph::type num_vertices) -> std::vector<std::complex<long long>> {
+    auto A = graph.to_adjacency_matrix();
+
+    using complex_matrix_t = Eigen::Matrix<std::complex<int64_t>, Eigen::Dynamic, Eigen::Dynamic>;
+
+    // A to complex<uint64_t>
+    complex_matrix_t Ai = A.cast<std::complex<int64_t>>();
+    assert (Ai.rows() == Ai.cols());
+    for (int i = 0; i < Ai.rows(); ++i) {
+        for (int j = 0; j < Ai.cols(); ++j) {
+            if (A(i, j) != 0) {
+                Ai(i, j) = std::complex<int64_t>(2, 0);
+            } else if (i == j) {
+                Ai(i, j) = std::complex<int64_t>(-1, 1);
+            } else {
+                Ai(i, j) = std::complex<int64_t>(-1, -1);
+            }
+
+        }
+    }
+
+    std::vector<std::complex<long long>> homvector;
+    homvector.reserve(num_vertices+1);
+    
+    complex_matrix_t product = complex_matrix_t::Identity(Ai.rows(), Ai.cols());
+    homvector.push_back(product.sum());
+    for (int n = 0; n < num_vertices; ++n) {
+        product = product * Ai;
+        homvector.push_back(product.sum());
+    }
+
+    return homvector;
+}
+
+
+auto compute_poly_path_homvec(SmallGraph graph, SmallGraph::type num_vertices) -> std::vector<long long> {
+    auto A = graph.to_adjacency_matrix();
+
+    using double_matrix_t = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
+
+    double_matrix_t Ai = A.cast<double>();
+    assert (Ai.rows() == Ai.cols());
+    for (int i = 0; i < Ai.rows(); ++i) {
+        Ai(i, i) = std::exp(static_cast<double>(1.0));
+    }
+
+    std::vector<long long> homvector;
+    homvector.reserve(num_vertices+1);
+    
+    double_matrix_t product = double_matrix_t::Identity(Ai.rows(), Ai.cols());
+    homvector.push_back(
+        static_cast<long long>(std::round(product.sum()))
+    );
+    for (int n = 0; n < num_vertices; ++n) {
+        product = product * Ai;
+        homvector.push_back(
+            static_cast<long long>(std::round(product.sum()*100000))
+        );
+    }
+
+    return homvector;
+}
+
+
 
 
 
