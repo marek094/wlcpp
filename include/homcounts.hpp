@@ -196,7 +196,38 @@ auto compute_poly_path_homvec(SmallGraph graph, SmallGraph::type num_vertices) -
 }
 
 
+auto compute_complex_pathwidth_one_homvec(SmallGraph graph, SmallGraph::type num_vertices) -> std::vector<std::complex<long long>> {
+    auto A = graph.to_adjacency_matrix();
+    auto D = graph.to_degree_matrix();
 
+    using complex_matrix_t = Eigen::Matrix<std::complex<int64_t>, Eigen::Dynamic, Eigen::Dynamic>;
+
+    // A to complex<uint64_t>
+    complex_matrix_t Ai = A.cast<std::complex<int64_t>>();
+    assert (Ai.rows() == Ai.cols());
+    for (int i = 0; i < Ai.rows(); ++i) {
+        for (int j = 0; j < Ai.cols(); ++j) {
+            if (A(i, j) != 0) {
+                Ai(i, j) = std::complex<int64_t>(1, 0);
+            } else if (i == j) {
+                Ai(i, j) = std::complex<int64_t>(0, D(i, i));
+            }
+
+        }
+    }
+
+    std::vector<std::complex<long long>> homvector;
+    homvector.reserve(num_vertices+1);
+    
+    complex_matrix_t product = complex_matrix_t::Identity(Ai.rows(), Ai.cols());
+    homvector.push_back(product.sum());
+    for (int n = 0; n < num_vertices; ++n) {
+        product = product * Ai;
+        homvector.push_back(product.sum());
+    }
+
+    return homvector;
+}
 
 
 } // namespace wl
