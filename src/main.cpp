@@ -126,18 +126,29 @@ int main(int argc, char* argv[]) {
         do_pathwith = std::atoi(argv[5]);
     }
 
+    std::string file_path_str = argv[1];
 
-    std::filesystem::path file_path = argv[1];
-
-    auto get_graph_list = [=]() {
-        if (file_path.extension() == ".txt" && file_path.stem().string().substr(0, 4) == "tree") {    
-            return wl::read_graph_from_tree_txt_file(file_path, limit, skip);
-        } else
-        if (file_path.extension() == ".txt") {
-            return wl::read_graph_from_labeled_txt_file(file_path, limit, skip);
+    auto get_graph_list = [=]() -> std::vector<wl::SmallGraph> {
+        std::istringstream iss(file_path_str);
+        auto graph_list = std::vector<wl::SmallGraph>{};
+        for (std::string token; std::getline(iss, token, ' '); ) {
+            std::filesystem::path file_path = token;
+            
+            if (file_path.extension() == ".txt" && file_path.stem().string().substr(0, 4) == "tree") {    
+                auto r = wl::read_graph_from_tree_txt_file(file_path, limit, skip);
+            } else
+            if (file_path.extension() == ".txt") {
+                auto r = wl::read_graph_from_labeled_txt_file(file_path, limit, skip);
+            }
+            assert(file_path.extension() == ".g6");
+            auto r = wl::read_graph_from_graph6_file(file_path, limit, skip);
+            if (graph_list.empty()) {
+                graph_list = std::move(r);
+            } else {
+                graph_list.insert(graph_list.end(), r.begin(), r.end());
+            }
         }
-        assert(file_path.extension() == ".g6");
-        return wl::read_graph_from_graph6_file(file_path, limit, skip);
+        return graph_list;
     };
 
 
@@ -154,14 +165,14 @@ int main(int argc, char* argv[]) {
             classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j])] += 1;
         }
 
-        int sum = 0;
-        for (int j = 0; j < homvec_out.size()-plus; ++j) {
-            sum += homvec_out[j];
-        }
-        for (int j = 0; j <= plus; ++j) {
-            sum += homvec_out[n+j];
-            classes["xN+"+std::to_string(j)][std::to_string(sum)] += 1;
-        }
+        // int sum = 0;
+        // for (int j = 0; j < homvec_out.size()-plus; ++j) {
+        //     sum += homvec_out[j];
+        // }
+        // for (int j = 0; j <= plus; ++j) {
+        //     sum += homvec_out[n+j];
+        //     classes["xN+"+std::to_string(j)][std::to_string(sum)] += 1;
+        // }
 
         int sum_odd = 0;
         int sum_even = 0;
