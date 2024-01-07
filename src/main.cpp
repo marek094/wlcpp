@@ -17,12 +17,96 @@
 #include <complex>
 #include <map>
 
+
+
+using map_hashmap_t = std::map<std::string, ska::unordered_map<std::string, int>>;
+using vecmap_hashmap_t = std::vector<map_hashmap_t>;
+
+using namespace std::string_literals;
+
+struct config_t {
+    int plus = 0;
+};
+
+
+template<typename InpFunc, typename ThreadFunc>
+void test_run(std::string name, InpFunc get_graph_list, ThreadFunc&& thread_func) {
+    // timer 
+    auto start = std::chrono::high_resolution_clock::now();
+
+    auto par_classes = vecmap_hashmap_t{};
+
+    // get omp parallel threads count 
+    int num_threads = omp_get_max_threads();
+    par_classes.resize(num_threads);
+
+
+    using return_type = decltype(thread_func(get_graph_list()[0], par_classes[0]));
+    
+    std::vector< return_type > homvec_list{};
+
+    {
+        auto graph_list = get_graph_list();
+        std::cout << "Read " << graph_list.size() << " graphs.\n";
+        int percent = std::max(graph_list.size() / 100, 1UL);
+        homvec_list.resize(graph_list.size());
+
+        #pragma omp parallel for
+        for (int i = 0; i < graph_list.size(); i++) {
+            // std::cout << "X" << std::endl;
+            homvec_list[i] = thread_func(
+                graph_list[i],
+                par_classes[omp_get_thread_num()]
+            );
+
+            if (i % percent == percent-1) {
+                std::cout << "|" << std::flush;
+            }
+        }
+        
+        std::cout << "\nDone with computation" << std::endl;
+    }
+    
+    // aggregate classes 
+    auto& classes = par_classes.front();
+    {
+        for (int i = 1; i < par_classes.size(); ++i) {
+            for (auto &&[key, value] : par_classes[i]) {
+                for (auto &&[key2, value2] : value) {
+                    classes[key][key2] += value2;
+                }
+            }
+            std::cout << "/" << std::flush;
+
+            // make the space available in par_classes[i]
+            par_classes[i] = map_hashmap_t{};
+        }
+
+        std::cout << "\nDone with aggregation" << std::endl;
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::cout << "\n\t " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms";
+    for (auto &&[key, value] : classes) {
+        std::cout << "\n\t" << name << " classes " << key << ": " << value.size() << "";
+    }
+    std::cout << "\n\n\n";
+
+}
+
+
+
+
+
+
+
 int main(int argc, char* argv[]) {
     if (argc < 2) {
         std::cerr << "Usage: " << argv[0] << " <path_to_graph6_file>\n";
         return 1;
     }
     
+    size_t threads = 1;
     if (argc >= 3) {
         omp_set_num_threads(std::atoi(argv[2]));
     }
@@ -42,28 +126,6 @@ int main(int argc, char* argv[]) {
         do_pathwith = std::atoi(argv[5]);
     }
 
-    // std::string s = "";
-    // // s += (char)126;
-    // // s += (char)66;
-    // // s += (char)63;
-    // // s += (char)120;
-    // s += (char)68;
-
-    // s += (char)81;
-    // s += (char)99;
-
-    // std::cout << s << '\n';
-
-    // auto g = wl::graph6_to_graph(s);
-    
-    // std::cout << "vertices: " << (int)g.number_of_vertices() << '\n';
-
-    // for (auto &&edge : g.edges) {
-    //     std::cout << "(" << (int)edge.first << " " << (int)edge.second << "), ";
-    // }
-    // std::cout << '\n';
-
-    // return 0;
 
     std::filesystem::path file_path = argv[1];
 
@@ -78,352 +140,227 @@ int main(int argc, char* argv[]) {
         return wl::read_graph_from_graph6_file(file_path, limit, skip);
     };
 
-    int percent = 100000;
+
+
     int plus = 9;
+    
 
+    test_run("compute_path_homvec"s, get_graph_list, [=](auto&& graph, auto& classes) {
+        auto homvec_out = wl::compute_path_homvec(graph, graph.number_of_vertices()+plus);
+            
+        classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
+        uint64_t n = homvec_out.size() -plus-1;
+        for (int j = 0; j <= plus; ++j) {
+            classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j])] += 1;
+        }
+
+        int sum = 0;
+        for (int j = 0; j < homvec_out.size()-plus; ++j) {
+            sum += homvec_out[j];
+        }
+        for (int j = 0; j <= plus; ++j) {
+            sum += homvec_out[n+j];
+            classes["xN+"+std::to_string(j)][std::to_string(sum)] += 1;
+        }
+
+        int sum_odd = 0;
+        int sum_even = 0;
+        for (int j = 0; j < homvec_out.size()-plus; ++j) {
+            if (j % 2 == 0) {
+                sum_even += homvec_out[j];
+            } else {
+                sum_odd += homvec_out[j];
+            }
+        }
+        for (int j = 0; j <= plus; ++j) {
+            if ((n+j) % 2 == 0) {
+                sum_even += homvec_out[n+j];
+            } else {
+                sum_odd += homvec_out[n+j];
+            }
+            classes["yN+"+std::to_string(j)][std::to_string(sum_even) + "|" + std::to_string(sum_odd)] += 1;
+        }
+
+        return homvec_out;
+    });
+
+
+    test_run("compute_complex_path_homvec"s, get_graph_list, [=](auto&& graph, auto& classes) {
+        auto homvec_out = wl::compute_complex_path_homvec(graph, graph.number_of_vertices()+plus);
+                
+        classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
+        uint64_t n = homvec_out.size() -plus-1;
+        for (int j = 0; j <= plus; ++j) {
+            classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j].real()) + "|" + std::to_string(homvec_out[n+j].imag())] += 1;
+        }
+
+        return homvec_out;
+    });
+
+
+    test_run("compute_complex_path_homvec(-)"s, get_graph_list, [=](auto&& graph, auto& classes) {
+        auto homvec_out =  wl::compute_complex_path_homvec(graph, graph.number_of_vertices()+plus, -1);
+                
+        classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
+        uint64_t n = homvec_out.size() -plus-1;
+        for (int j = 0; j <= plus; ++j) {
+            classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j].real()) + "|" + std::to_string(homvec_out[n+j].imag())] += 1;
+        }
+
+        return homvec_out;
+    });
 
     
-    {
-        auto classes = std::map<std::string, ska::unordered_map<std::string, int>>{};
-        // timer 
-        auto start = std::chrono::high_resolution_clock::now();
-        classes.clear();
-
-        std::vector<std::vector<unsigned long long>> homvec_list{};
-        {
-            auto graph_list = get_graph_list();
-            std::cout << "Read " << graph_list.size() << " graphs.\n";
-            percent = std::max(graph_list.size() / 100, 1UL);
-
-            homvec_list.resize(graph_list.size());
-
-            #pragma omp parallel for
-            for (int i = 0; i < graph_list.size(); i++) {
-                homvec_list[i] = wl::compute_path_homvec(graph_list[i], graph_list[i].number_of_vertices()+plus);
-                if (i % percent == percent-1) {
-                    std::cout << "|";
-                    std::cout.flush();
-                }
-            }
-            
-            std::cout << "\nDone with computation";
+    test_run("compute_complex_path_homvec_boost(B)"s, get_graph_list, [=](auto&& graph, auto& classes) {
+        auto homvec_out =  wl::compute_complex_path_homvec_boost(graph, graph.number_of_vertices()+plus);
+                
+        classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
+        uint64_t n = homvec_out.size() -plus-1;
+        for (int j = 0; j <= plus; ++j) {
+            classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j].real()) + "|" + std::to_string(homvec_out[n+j].imag())] += 1;
         }
+
+        return homvec_out;
+    });
+
+    
+
+    // {
+    //     auto classes = std::map<std::string, ska::unordered_map<std::string, int>>{};
+    //     // timer 
+    //     auto start = std::chrono::high_resolution_clock::now();
+    //     classes.clear();
+
+    //     std::vector<std::vector<long long>> homvec_list{};
+
+    //     {
+    //         auto graph_list = get_graph_list();
+    //         std::cout << "Read " << graph_list.size() << " graphs.\n";
+
+    //         homvec_list.resize(graph_list.size());
+            
+    //         #pragma omp parallel for
+    //         for (int i = 0; i < graph_list.size(); i++) {
+    //             homvec_list[i] = wl::compute_poly_path_homvec(graph_list[i], graph_list[i].number_of_vertices()+plus);
+    //             if (i % percent == percent-1) {
+    //                 std::cout << "|";
+    //                 std::cout.flush();
+    //             }
+    //         }
+
+    //         std::cout << "\nDone with computation" << std::endl;
+    //     }
+
+    //     for (int i = 0; i < homvec_list.size(); i++) {
+    //         classes["   "][wl::stringyfy_vector(homvec_list[i])] += 1;
+    //         uint64_t n = homvec_list[i].size() -plus-1;
+    //         for (int j = 0; j <= plus; ++j) {
+    //             classes["N+"+std::to_string(j)][std::to_string(homvec_list[i][n+j])] += 1;
+    //         }
+    //     }
+    
+
+    //     auto end = std::chrono::high_resolution_clock::now();
+    //     std::cout << "\n\t " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms";
+    //     for (auto &&[key, value] : classes) {
+    //         std::cout << "\n\tcompute_poly_path_homvec classes " << key << ": " << value.size() << "";
+    //     }
+    //     std::cout << "\n\n\n";
+    // }
+
+
+
+
+    // if (do_pathwith)    
+    // {
+    //     int plus = 3;
+    //     auto classes = std::map<std::string, ska::unordered_map<std::string, int>>{};
+    //     // timer 
+    //     auto start = std::chrono::high_resolution_clock::now();
+    //     classes.clear();
+
+    //     std::vector<std::vector<unsigned long long>> homvec_list{};
+    //     {
+    //         auto graph_list = get_graph_list();
+    //         std::cout << "Read " << graph_list.size() << " graphs.\n";
+    //         percent = std::max(graph_list.size() / 100, 1UL);
+
+    //         homvec_list.resize(graph_list.size());
+
+    //         #pragma omp parallel for
+    //         for (int i = 0; i < graph_list.size(); i++) {
+    //             homvec_list[i] = wl::compute_pathwidth_one_homvec(graph_list[i], graph_list[i].number_of_vertices()+plus);
+    //             if (i % percent == percent-1) {
+    //                 std::cout << "|";
+    //                 std::cout.flush();
+    //             }
+    //         }
+            
+    //         std::cout << "\nDone with computation" << std::endl;
+    //     }
         
         
-        for (int i = 0; i < homvec_list.size(); i++) {
-            classes["   "][wl::stringyfy_vector(homvec_list[i])] += 1;
-            uint64_t n = homvec_list[i].size() -plus-1;
-            for (int j = 0; j <= plus; ++j) {
-                classes["N+"+std::to_string(j)][std::to_string(homvec_list[i][n+j])] += 1;
-            }
+    //     for (int i = 0; i < homvec_list.size(); i++) {
+    //         classes["   "][wl::stringyfy_vector(homvec_list[i])] += 1;
+    //         uint64_t n = homvec_list[i].size() -plus-1;
+    //         for (int j = 0; j <= plus; ++j) {
+    //             classes["N+"+std::to_string(j)][std::to_string(homvec_list[i][n+j])] += 1;
+    //         }
+    //     }
 
-            int sum = 0;
-            for (int j = 0; j < homvec_list[i].size()-plus; ++j) {
-                sum += homvec_list[i][j];
-            }
-            for (int j = 0; j <= plus; ++j) {
-                sum += homvec_list[i][n+j];
-                classes["xN+"+std::to_string(j)][std::to_string(sum)] += 1;
-            }
-
-            int sum_odd = 0;
-            int sum_even = 0;
-            for (int j = 0; j < homvec_list[i].size()-plus; ++j) {
-                if (j % 2 == 0) {
-                    sum_even += homvec_list[i][j];
-                } else {
-                    sum_odd += homvec_list[i][j];
-                }
-            }
-            for (int j = 0; j <= plus; ++j) {
-                if ((n+j) % 2 == 0) {
-                    sum_even += homvec_list[i][n+j];
-                } else {
-                    sum_odd += homvec_list[i][n+j];
-                }
-                classes["yN+"+std::to_string(j)][std::to_string(sum_even) + "|" + std::to_string(sum_odd)] += 1;
-            }
-        }
-
-        auto end = std::chrono::high_resolution_clock::now();
-        std::cout << "\n\t " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms";
-        for (auto &&[key, value] : classes) {
-            std::cout << "\n\tcompute_path_homvec classes " << key << ": " << value.size() << "";
-        }
-        std::cout << "\n\n\n";
-    }
+    //     auto end = std::chrono::high_resolution_clock::now();
+    //     std::cout << "\n\t " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms";
+    //     for (auto &&[key, value] : classes) {
+    //         std::cout << "\n\tcompute_pathwidth_one_homvec classes " << key << ": " << value.size() << "";
+    //     }
+    //     std::cout << "\n\n\n";
+    // }
 
 
-    {
-        auto classes = std::map<std::string, ska::unordered_map<std::string, int>>{};
-        // timer 
-        auto start = std::chrono::high_resolution_clock::now();
-        classes.clear();
-        std::vector<std::vector<std::complex<long long>>> homvec_list{};
 
-        {
-            auto graph_list = get_graph_list();
-            std::cout << "Read " << graph_list.size() << " graphs.\n";
+    // if (do_pathwith)
+    // {
+    //     auto classes = std::map<std::string, ska::unordered_map<std::string, int>>{};
+    //     // timer 
+    //     auto start = std::chrono::high_resolution_clock::now();
+    //     classes.clear();
 
-            homvec_list.resize(graph_list.size());
+    //     std::vector<std::vector<std::complex<long long>>> homvec_list{};
+
+    //     {
+    //         auto graph_list = get_graph_list();
+    //         std::cout << "Read " << graph_list.size() << " graphs.\n";
+
+    //         homvec_list.resize(graph_list.size());
             
-            #pragma omp parallel for
-            for (int i = 0; i < graph_list.size(); i++) {
-                homvec_list[i] = wl::compute_complex_path_homvec(graph_list[i], graph_list[i].number_of_vertices()+plus, 1);
-                if (i % percent == percent-1) {
-                    std::cout << "|";
-                    std::cout.flush();
-                }
-            }
+    //         #pragma omp parallel for
+    //         for (int i = 0; i < graph_list.size(); i++) {
+    //             homvec_list[i] = wl::compute_complex_pathwidth_one_homvec(graph_list[i], graph_list[i].number_of_vertices()+plus);
+    //             if (i % percent == percent-1) {
+    //                 std::cout << "|";
+    //                 std::cout.flush();
+    //             }
+    //         }
 
-            std::cout << "\nDone with computation";
-        }
+    //         std::cout << "\nDone with computation" << std::endl;
+    //     }
 
-        for (int i = 0; i < homvec_list.size(); i++) {
-            classes["   "][wl::stringyfy_vector(homvec_list[i])] += 1;
-            uint64_t n = homvec_list[i].size() -plus-1;
-            for (int j = 0; j <= plus; ++j) {
-                classes["N+"+std::to_string(j)][std::to_string(homvec_list[i][n+j].real()) + "|" + std::to_string(homvec_list[i][n+j].imag())] += 1;
-            }
-        }
+    //     for (int i = 0; i < homvec_list.size(); i++) {
+    //         classes["   "][wl::stringyfy_vector(homvec_list[i])] += 1;
+    //         uint64_t n = homvec_list[i].size() -plus-1;
+    //         for (int j = 0; j <= plus; ++j) {
+    //             classes["N+"+std::to_string(j)][std::to_string(homvec_list[i][n+j].real()) + "|" + std::to_string(homvec_list[i][n+j].imag())] += 1;
+    //         }
+    //     }
     
 
-        auto end = std::chrono::high_resolution_clock::now();
-        std::cout << "\n\t " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms";
-        for (auto &&[key, value] : classes) {
-            std::cout << "\n\tcompute_complex_path_homvec(+) classes " << key << ": " << value.size() << "";
-        }
-        std::cout << "\n\n\n";
-    }
-    
-
-    
-    {
-        auto classes = std::map<std::string, ska::unordered_map<std::string, int>>{};
-        // timer 
-        auto start = std::chrono::high_resolution_clock::now();
-        classes.clear();
-
-        std::vector<std::vector<std::complex<long long>>> homvec_list{};
-
-        {
-            auto graph_list = get_graph_list();
-            std::cout << "Read " << graph_list.size() << " graphs.\n";
-
-            homvec_list.resize(graph_list.size());
-            
-            #pragma omp parallel for
-            for (int i = 0; i < graph_list.size(); i++) {
-                homvec_list[i] = wl::compute_complex_path_homvec(graph_list[i], graph_list[i].number_of_vertices()+plus, -1);
-                if (i % percent == percent-1) {
-                    std::cout << "|";
-                    std::cout.flush();
-                }
-            }
-
-            std::cout << "\nDone with computation";
-        }
-
-        for (int i = 0; i < homvec_list.size(); i++) {
-            classes["   "][wl::stringyfy_vector(homvec_list[i])] += 1;
-            uint64_t n = homvec_list[i].size() -plus-1;
-            for (int j = 0; j <= plus; ++j) {
-                classes["N+"+std::to_string(j)][std::to_string(homvec_list[i][n+j].real()) + "|" + std::to_string(homvec_list[i][n+j].imag())] += 1;
-            }
-        }
-    
-
-        auto end = std::chrono::high_resolution_clock::now();
-        std::cout << "\n\t " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms";
-        for (auto &&[key, value] : classes) {
-            std::cout << "\n\tcompute_complex_path_homvec(-) classes " << key << ": " << value.size() << "";
-        }
-        std::cout << "\n\n\n";
-    }
-    
-
-    {
-        auto classes = std::map<std::string, ska::unordered_map<std::string, int>>{};
-        // timer 
-        auto start = std::chrono::high_resolution_clock::now();
-        classes.clear();
-
-        std::vector<std::vector<std::complex<long long>>> homvec_list{};
-
-        {
-            auto graph_list = get_graph_list();
-            std::cout << "Read " << graph_list.size() << " graphs.\n";
-
-            homvec_list.resize(graph_list.size());
-            
-            #pragma omp parallel for
-            for (int i = 0; i < graph_list.size(); i++) {
-                homvec_list[i] = wl::compute_complex_path_homvec_boost(graph_list[i], graph_list[i].number_of_vertices()+plus);
-                if (i % percent == percent-1) {
-                    std::cout << "|";
-                    std::cout.flush();
-                }
-            }
-
-            std::cout << "\nDone with computation";
-        }
-
-        for (int i = 0; i < homvec_list.size(); i++) {
-            classes["   "][wl::stringyfy_vector(homvec_list[i])] += 1;
-            uint64_t n = homvec_list[i].size() -plus-1;
-            for (int j = 0; j <= plus; ++j) {
-                classes["N+"+std::to_string(j)][std::to_string(homvec_list[i][n+j].real()) + "|" + std::to_string(homvec_list[i][n+j].imag())] += 1;
-            }
-        }
-    
-
-        auto end = std::chrono::high_resolution_clock::now();
-        std::cout << "\n\t " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms";
-        for (auto &&[key, value] : classes) {
-            std::cout << "\n\tcompute_complex_path_homvec(B) classes " << key << ": " << value.size() << "";
-        }
-        std::cout << "\n\n\n";
-    }
-    
-
-
-
-    {
-        auto classes = std::map<std::string, ska::unordered_map<std::string, int>>{};
-        // timer 
-        auto start = std::chrono::high_resolution_clock::now();
-        classes.clear();
-
-        std::vector<std::vector<long long>> homvec_list{};
-
-        {
-            auto graph_list = get_graph_list();
-            std::cout << "Read " << graph_list.size() << " graphs.\n";
-
-            homvec_list.resize(graph_list.size());
-            
-            #pragma omp parallel for
-            for (int i = 0; i < graph_list.size(); i++) {
-                homvec_list[i] = wl::compute_poly_path_homvec(graph_list[i], graph_list[i].number_of_vertices()+plus);
-                if (i % percent == percent-1) {
-                    std::cout << "|";
-                    std::cout.flush();
-                }
-            }
-
-            std::cout << "\nDone with computation";
-        }
-
-        for (int i = 0; i < homvec_list.size(); i++) {
-            classes["   "][wl::stringyfy_vector(homvec_list[i])] += 1;
-            uint64_t n = homvec_list[i].size() -plus-1;
-            for (int j = 0; j <= plus; ++j) {
-                classes["N+"+std::to_string(j)][std::to_string(homvec_list[i][n+j])] += 1;
-            }
-        }
-    
-
-        auto end = std::chrono::high_resolution_clock::now();
-        std::cout << "\n\t " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms";
-        for (auto &&[key, value] : classes) {
-            std::cout << "\n\tcompute_poly_path_homvec classes " << key << ": " << value.size() << "";
-        }
-        std::cout << "\n\n\n";
-    }
-
-
-
-
-    if (do_pathwith)    
-    {
-        int plus = 3;
-        auto classes = std::map<std::string, ska::unordered_map<std::string, int>>{};
-        // timer 
-        auto start = std::chrono::high_resolution_clock::now();
-        classes.clear();
-
-        std::vector<std::vector<unsigned long long>> homvec_list{};
-        {
-            auto graph_list = get_graph_list();
-            std::cout << "Read " << graph_list.size() << " graphs.\n";
-            percent = std::max(graph_list.size() / 100, 1UL);
-
-            homvec_list.resize(graph_list.size());
-
-            #pragma omp parallel for
-            for (int i = 0; i < graph_list.size(); i++) {
-                homvec_list[i] = wl::compute_pathwidth_one_homvec(graph_list[i], graph_list[i].number_of_vertices()+plus);
-                if (i % percent == percent-1) {
-                    std::cout << "|";
-                    std::cout.flush();
-                }
-            }
-            
-            std::cout << "\nDone with computation";
-        }
-        
-        
-        for (int i = 0; i < homvec_list.size(); i++) {
-            classes["   "][wl::stringyfy_vector(homvec_list[i])] += 1;
-            uint64_t n = homvec_list[i].size() -plus-1;
-            for (int j = 0; j <= plus; ++j) {
-                classes["N+"+std::to_string(j)][std::to_string(homvec_list[i][n+j])] += 1;
-            }
-        }
-
-        auto end = std::chrono::high_resolution_clock::now();
-        std::cout << "\n\t " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms";
-        for (auto &&[key, value] : classes) {
-            std::cout << "\n\tcompute_pathwidth_one_homvec classes " << key << ": " << value.size() << "";
-        }
-        std::cout << "\n\n\n";
-    }
-
-
-
-    if (do_pathwith)
-    {
-        auto classes = std::map<std::string, ska::unordered_map<std::string, int>>{};
-        // timer 
-        auto start = std::chrono::high_resolution_clock::now();
-        classes.clear();
-
-        std::vector<std::vector<std::complex<long long>>> homvec_list{};
-
-        {
-            auto graph_list = get_graph_list();
-            std::cout << "Read " << graph_list.size() << " graphs.\n";
-
-            homvec_list.resize(graph_list.size());
-            
-            #pragma omp parallel for
-            for (int i = 0; i < graph_list.size(); i++) {
-                homvec_list[i] = wl::compute_complex_pathwidth_one_homvec(graph_list[i], graph_list[i].number_of_vertices()+plus);
-                if (i % percent == percent-1) {
-                    std::cout << "|";
-                    std::cout.flush();
-                }
-            }
-
-            std::cout << "\nDone with computation";
-        }
-
-        for (int i = 0; i < homvec_list.size(); i++) {
-            classes["   "][wl::stringyfy_vector(homvec_list[i])] += 1;
-            uint64_t n = homvec_list[i].size() -plus-1;
-            for (int j = 0; j <= plus; ++j) {
-                classes["N+"+std::to_string(j)][std::to_string(homvec_list[i][n+j].real()) + "|" + std::to_string(homvec_list[i][n+j].imag())] += 1;
-            }
-        }
-    
-
-        auto end = std::chrono::high_resolution_clock::now();
-        std::cout << "\n\t " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms";
-        for (auto &&[key, value] : classes) {
-            std::cout << "\n\tcompute_complex_pathwidth_one_homvec classes " << key << ": " << value.size() << "";
-        }
-        std::cout << "\n\n\n";
-    }
+    //     auto end = std::chrono::high_resolution_clock::now();
+    //     std::cout << "\n\t " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms";
+    //     for (auto &&[key, value] : classes) {
+    //         std::cout << "\n\tcompute_complex_pathwidth_one_homvec classes " << key << ": " << value.size() << "";
+    //     }
+    //     std::cout << "\n\n\n";
+    // }
 
 
     
