@@ -5,6 +5,7 @@
 #include "wl.hpp"
 #include "explain.hpp"
 
+#include <flat_hash_map/unordered_map.hpp>
 #include <omp.h>
 
 #include <iostream>
@@ -83,7 +84,7 @@ int main(int argc, char* argv[]) {
 
     
     {
-        auto classes = std::map<std::string, std::unordered_map<std::string, int>>{};
+        auto classes = std::map<std::string, ska::unordered_map<std::string, int>>{};
         // timer 
         auto start = std::chrono::high_resolution_clock::now();
         classes.clear();
@@ -154,7 +155,7 @@ int main(int argc, char* argv[]) {
 
 
     {
-        auto classes = std::map<std::string, std::unordered_map<std::string, int>>{};
+        auto classes = std::map<std::string, ska::unordered_map<std::string, int>>{};
         // timer 
         auto start = std::chrono::high_resolution_clock::now();
         classes.clear();
@@ -198,7 +199,7 @@ int main(int argc, char* argv[]) {
 
     
     {
-        auto classes = std::map<std::string, std::unordered_map<std::string, int>>{};
+        auto classes = std::map<std::string, ska::unordered_map<std::string, int>>{};
         // timer 
         auto start = std::chrono::high_resolution_clock::now();
         classes.clear();
@@ -242,7 +243,7 @@ int main(int argc, char* argv[]) {
     
 
     {
-        auto classes = std::map<std::string, std::unordered_map<std::string, int>>{};
+        auto classes = std::map<std::string, ska::unordered_map<std::string, int>>{};
         // timer 
         auto start = std::chrono::high_resolution_clock::now();
         classes.clear();
@@ -288,7 +289,7 @@ int main(int argc, char* argv[]) {
 
 
     {
-        auto classes = std::map<std::string, std::unordered_map<std::string, int>>{};
+        auto classes = std::map<std::string, ska::unordered_map<std::string, int>>{};
         // timer 
         auto start = std::chrono::high_resolution_clock::now();
         classes.clear();
@@ -336,7 +337,7 @@ int main(int argc, char* argv[]) {
     if (do_pathwith)    
     {
         int plus = 3;
-        auto classes = std::map<std::string, std::unordered_map<std::string, int>>{};
+        auto classes = std::map<std::string, ska::unordered_map<std::string, int>>{};
         // timer 
         auto start = std::chrono::high_resolution_clock::now();
         classes.clear();
@@ -382,7 +383,7 @@ int main(int argc, char* argv[]) {
 
     if (do_pathwith)
     {
-        auto classes = std::map<std::string, std::unordered_map<std::string, int>>{};
+        auto classes = std::map<std::string, ska::unordered_map<std::string, int>>{};
         // timer 
         auto start = std::chrono::high_resolution_clock::now();
         classes.clear();
@@ -433,8 +434,8 @@ int main(int argc, char* argv[]) {
 
 
     // {
-    //     auto rehash = std::unordered_map<std::string, unsigned long long>{};
-    //     auto classes = std::unordered_map<std::string, std::vector<int>>{};
+    //     auto rehash = ska::unordered_map<std::string, unsigned long long>{};
+    //     auto classes = ska::unordered_map<std::string, std::vector<int>>{};
     //     auto start = std::chrono::high_resolution_clock::now();
     //     classes.clear();
     //     int i = 0;
@@ -455,7 +456,7 @@ int main(int argc, char* argv[]) {
     // {
     //     auto rehash = wl::rehash_t{};
     //     auto start = std::chrono::high_resolution_clock::now();
-    //     auto classes = std::unordered_map<std::string, std::vector<std::pair<int, wl::colvec_t>>>{};
+    //     auto classes = ska::unordered_map<std::string, std::vector<std::pair<int, wl::colvec_t>>>{};
     //     int i = 0;
 
     //     auto vecs = std::vector<wl::colvec_t>{};
