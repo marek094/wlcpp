@@ -5,7 +5,7 @@
 #include "wl.hpp"
 #include "explain.hpp"
 
-#include <flat_hash_map/unordered_map.hpp>
+#include <ska/unordered_map.hpp>
 #include <omp.h>
 
 #include <iostream>
