@@ -237,6 +237,8 @@ int main(int argc, char* argv[]) {
 
     
 
+    
+
 
     // {
     //     auto classes = std::map<std::string, ska::unordered_map<std::string, int>>{};
@@ -322,13 +324,13 @@ int main(int argc, char* argv[]) {
     // });
 
     test_run("compute_pathwidth_one_homvec_v2", get_graph_list, [=](auto&& graph, auto& classes) {
-        auto homvec_out = wl::compute_pathwidth_one_homvec_v2(graph, graph.number_of_vertices()+6);
+        auto homvec_out = wl::compute_pathwidth_one_homvec_v2(graph, graph.number_of_vertices()+4);
             
         classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
         uint64_t n = homvec_out.size() -plus-1;
-        for (int j = 0; j <= plus; ++j) {
-            classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j])] += 1;
-        }
+        // for (int j = 0; j <= plus; ++j) {
+        //     classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j])] += 1;
+        // }
 
         // int sum_odd = 0;
         // int sum_even = 0;
@@ -357,9 +359,9 @@ int main(int argc, char* argv[]) {
             
         classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
         uint64_t n = homvec_out.size() -plus-1;
-        for (int j = 0; j <= plus; ++j) {
-            classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j])] += 1;
-        }
+        // for (int j = 0; j <= plus; ++j) {
+        //     classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j])] += 1;
+        // }
 
         // int sum_odd = 0;
         // int sum_even = 0;
@@ -430,6 +432,39 @@ int main(int argc, char* argv[]) {
     //     }
     //     std::cout << "\n\n\n";
     // }
+
+
+
+    test_run("compute_complex_pathwidth_one_homvec", get_graph_list, [=](auto&& graph, auto& classes) {
+        auto homvec_out = wl::compute_complex_pathwidth_one_homvec(graph, graph.number_of_vertices()+plus);
+
+        for (int i = 0; i < homvec_out.size(); i++) {
+            classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
+            uint64_t n = homvec_out.size() -plus-1;
+            for (int j = 0; j <= plus; ++j) {
+                classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j].real()) + "|" + std::to_string(homvec_out[n+j].imag())] += 1;
+            }
+        }
+
+        return homvec_out;
+    });
+    
+
+    test_run("compute_complex_pathwidth_one_homvec(D+Ax)", get_graph_list, [=](auto&& graph, auto& classes) {
+        auto homvec_out = wl::compute_complex_pathwidth_one_homvec(graph, graph.number_of_vertices()+plus, /*switch*/ true);
+
+        for (int i = 0; i < homvec_out.size(); i++) {
+            classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
+            uint64_t n = homvec_out.size() -plus-1;
+            for (int j = 0; j <= plus; ++j) {
+                classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j].real()) + "|" + std::to_string(homvec_out[n+j].imag())] += 1;
+            }
+        }
+
+        return homvec_out;
+    });
+    
+
 
 
 

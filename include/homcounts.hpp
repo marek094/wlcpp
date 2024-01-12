@@ -235,7 +235,7 @@ auto compute_poly_path_homvec(SmallGraph graph, SmallGraph::type num_vertices) -
 }
 
 
-auto compute_complex_pathwidth_one_homvec(SmallGraph graph, SmallGraph::type num_vertices) -> std::vector<std::complex<long long>> {
+auto compute_complex_pathwidth_one_homvec(SmallGraph graph, SmallGraph::type num_vertices, bool x_with_A=false) -> std::vector<std::complex<long long>> {
     auto A = graph.to_adjacency_matrix();
     auto D = graph.to_degree_matrix();
 
@@ -246,12 +246,20 @@ auto compute_complex_pathwidth_one_homvec(SmallGraph graph, SmallGraph::type num
     assert (Ai.rows() == Ai.cols());
     for (int i = 0; i < Ai.rows(); ++i) {
         for (int j = 0; j < Ai.cols(); ++j) {
-            if (A(i, j) != 0) {
-                Ai(i, j) = std::complex<int64_t>(1, 0);
-            } else if (i == j) {
-                Ai(i, j) = std::complex<int64_t>(0, D(i, i));
-            }
 
+            if (x_with_A) {
+                if (A(i, j) != 0) {
+                    Ai(i, j) = std::complex<int64_t>(0, 1);
+                } else if (i == j) {
+                    Ai(i, j) = std::complex<int64_t>(D(i, i), 0);
+                }
+            } else {
+                if (A(i, j) != 0) {
+                    Ai(i, j) = std::complex<int64_t>(1, 0);
+                } else if (i == j) {
+                    Ai(i, j) = std::complex<int64_t>(0, D(i, i));
+                }
+            }
         }
     }
 
