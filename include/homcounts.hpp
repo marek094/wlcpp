@@ -58,6 +58,8 @@ auto compute_pathwidth_one_homvec(SmallGraph const& graph, SmallGraph::type num_
     return homvector;
 }
 
+
+
 auto compute_pathwidth_one_homvec_v2(SmallGraph graph, SmallGraph::type num_vertices) -> std::vector<unsigned long long> {
     auto A = graph.to_adjacency_matrix();
     auto D = graph.to_degree_matrix();
@@ -86,6 +88,43 @@ auto compute_pathwidth_one_homvec_v2(SmallGraph graph, SmallGraph::type num_vert
     
     return homvector;
 }
+
+
+auto compute_pathwidth_one_homvec_bases(SmallGraph graph, SmallGraph::type plus,  SmallGraph::type max_Ds) -> std::vector<unsigned long long> {
+
+    auto A = graph.to_adjacency_matrix();
+    auto D = graph.to_degree_matrix();
+
+    using eigen_matrix_t = decltype(A);
+
+    std::vector<unsigned long long> homvector;
+
+    std::vector<eigen_matrix_t> matvector = {eigen_matrix_t::Identity(A.rows(), A.cols())};
+    {
+        for (int n = 0; n < (graph.number_of_vertices() / 2 + graph.number_of_vertices() % 2 + plus/2); ++n) {
+            matvector.push_back(matvector.back() * A);
+        }
+    }
+
+    eigen_matrix_t optD = eigen_matrix_t::Identity(A.rows(), A.cols());
+    for (int k = 0; k < max_Ds; ++k) {
+        for (int i0 = 0; i0 < (int)matvector.size(); ++i0) {
+            for (int i1 = i0; i1 < (int)matvector.size(); ++i1) {
+                auto to_hom = matvector[i0] * optD * matvector[i1];
+                homvector.push_back(to_hom.sum());
+            }
+        }
+        optD = optD * D;
+    }
+    
+    return homvector;
+}
+
+
+
+
+
+
 
 auto compute_path_homvec(SmallGraph graph, SmallGraph::type num_vertices) -> std::vector<unsigned long long> {
     auto A = graph.to_adjacency_matrix();

@@ -234,7 +234,9 @@ int main(int argc, char* argv[]) {
         return homvec_out;
     });
 
+
     
+
 
     // {
     //     auto classes = std::map<std::string, ska::unordered_map<std::string, int>>{};
@@ -278,6 +280,108 @@ int main(int argc, char* argv[]) {
     //     }
     //     std::cout << "\n\n\n";
     // }
+
+
+    // test_run("compute_pathwidth_one_homvec", get_graph_list, [=](auto&& graph, auto& classes) {
+    //     auto homvec_out = wl::compute_pathwidth_one_homvec(graph, graph.number_of_vertices()+plus);
+            
+    //     classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
+    //     uint64_t n = homvec_out.size() -plus-1;
+    //     for (int j = 0; j <= plus; ++j) {
+    //         classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j])] += 1;
+    //     }
+
+    //     // int sum = 0;
+    //     // for (int j = 0; j < homvec_out.size()-plus; ++j) {
+    //     //     sum += homvec_out[j];
+    //     // }
+    //     // for (int j = 0; j <= plus; ++j) {
+    //     //     sum += homvec_out[n+j];
+    //     //     classes["xN+"+std::to_string(j)][std::to_string(sum)] += 1;
+    //     // }
+
+    //     int sum_odd = 0;
+    //     int sum_even = 0;
+    //     for (int j = 0; j < homvec_out.size()-plus; ++j) {
+    //         if (j % 2 == 0) {
+    //             sum_even += homvec_out[j];
+    //         } else {
+    //             sum_odd += homvec_out[j];
+    //         }
+    //     }
+    //     for (int j = 0; j <= plus; ++j) {
+    //         if ((n+j) % 2 == 0) {
+    //             sum_even += homvec_out[n+j];
+    //         } else {
+    //             sum_odd += homvec_out[n+j];
+    //         }
+    //         classes["yN+"+std::to_string(j)][std::to_string(sum_even) + "|" + std::to_string(sum_odd)] += 1;
+    //     }
+
+    //     return homvec_out;
+    // });
+
+    test_run("compute_pathwidth_one_homvec_v2", get_graph_list, [=](auto&& graph, auto& classes) {
+        auto homvec_out = wl::compute_pathwidth_one_homvec_v2(graph, graph.number_of_vertices()+6);
+            
+        classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
+        uint64_t n = homvec_out.size() -plus-1;
+        for (int j = 0; j <= plus; ++j) {
+            classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j])] += 1;
+        }
+
+        // int sum_odd = 0;
+        // int sum_even = 0;
+        // for (int j = 0; j < homvec_out.size()-plus; ++j) {
+        //     if (j % 2 == 0) {
+        //         sum_even += homvec_out[j];
+        //     } else {
+        //         sum_odd += homvec_out[j];
+        //     }
+        // }
+        // for (int j = 0; j <= plus; ++j) {
+        //     if ((n+j) % 2 == 0) {
+        //         sum_even += homvec_out[n+j];
+        //     } else {
+        //         sum_odd += homvec_out[n+j];
+        //     }
+        //     classes["yN+"+std::to_string(j)][std::to_string(sum_even) + "|" + std::to_string(sum_odd)] += 1;
+        // }
+
+        return homvec_out;
+    });
+
+
+    test_run("compute_pathwidth_one_homvec_bases", get_graph_list, [=](auto&& graph, auto& classes) {
+        auto homvec_out = wl::compute_pathwidth_one_homvec_bases(graph, 6, 10);
+            
+        classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
+        uint64_t n = homvec_out.size() -plus-1;
+        for (int j = 0; j <= plus; ++j) {
+            classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j])] += 1;
+        }
+
+        // int sum_odd = 0;
+        // int sum_even = 0;
+        // for (int j = 0; j < homvec_out.size()-plus; ++j) {
+        //     if (j % 2 == 0) {
+        //         sum_even += homvec_out[j];
+        //     } else {
+        //         sum_odd += homvec_out[j];
+        //     }
+        // }
+        // for (int j = 0; j <= 6; ++j) {
+        //     if ((n+j) % 2 == 0) {
+        //         sum_even += homvec_out[n+j];
+        //     } else {
+        //         sum_odd += homvec_out[n+j];
+        //     }
+        //     classes["yN+"+std::to_string(j)][std::to_string(sum_even) + "|" + std::to_string(sum_odd)] += 1;
+        // }
+
+        return homvec_out;
+    });
+
 
 
 
