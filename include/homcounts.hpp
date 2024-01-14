@@ -35,7 +35,7 @@
 #include <string>
 #include <tuple>
 #include <array>
-
+#include <cmath>
 
 namespace wl { 
 
@@ -216,6 +216,38 @@ auto compute_complex_path_homvec(SmallGraph graph, SmallGraph::type num_vertices
 
     return homvector;
 }
+
+
+template<typename Matrix>
+Matrix fast_power(Matrix base, unsigned long long exponent) {
+    Matrix result = Matrix::Identity(base.rows(), base.cols());
+
+    while (exponent > 0) {
+        if (exponent & 1) {
+            result = result * base;
+        }
+        base = base * base;
+        exponent >>= 1;
+    }
+
+    return result;
+}
+
+
+
+template<typename Int = int64_t>
+auto compute_complex_path_homvec_log(SmallGraph graph, SmallGraph::type num_vertices) -> std::vector<std::complex<Int>> {
+    auto A = graph.to_adjacency_matrix();
+    auto n = A.rows();
+
+    using complex_matrix_t = Eigen::Matrix<std::complex<Int>, Eigen::Dynamic, Eigen::Dynamic>;
+    complex_matrix_t Ai = A.cast<std::complex<Int>>() * std::complex<Int>(0, 1);
+    
+    // compute ceil(nlog_2n)
+    unsigned long long nlog2n =  std::ceil(n * std::log2(n));
+    return {fast_power<complex_matrix_t>(Ai, nlog2n).sum()};
+}
+
 
 
 auto compute_complex_path_homvec_boost(SmallGraph graph, SmallGraph::type num_vertices) -> std::vector<std::complex<long long>> {

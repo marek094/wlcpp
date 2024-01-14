@@ -186,7 +186,8 @@ namespace Eigen {
             RequireInitialization = 1,
             ReadCost = 10 * R,
             AddCost = 10 * R,
-            MulCost = 14 * R
+            MulCost = 14 * R,
+            DivCost = 500 * R,
         };
 
         // // Since it's an integral type, epsilon and precision are not applicable
