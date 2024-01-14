@@ -4,6 +4,7 @@
 #include "homcounts.hpp"
 #include "wl.hpp"
 #include "explain.hpp"
+#include "crtu64t.hpp"
 
 #include <ska/unordered_map.hpp>
 #include <omp.h>
@@ -198,8 +199,8 @@ int main(int argc, char* argv[]) {
 
 
 
-        runs.emplace_back("compute_path_homvec<64*4>", [=](auto&& g, auto& c) {return func.operator()<wl::crt::crtu64t<4>>(g, c);});
-        runs.emplace_back("compute_path_homvec<64>", [=](auto&& g, auto& c) {return func.operator()<uint64_t>(g, c);});
+        runs.emplace_back("compute_path_homvec<4>", [=](auto&& g, auto& c) {return func.operator()<wl::crt::crtu64t<4>>(g, c);});
+        runs.emplace_back("compute_path_homvec<1>", [=](auto&& g, auto& c) {return func.operator()<uint64_t>(g, c);});
     }
 
 
@@ -245,28 +246,33 @@ int main(int argc, char* argv[]) {
         
     });
 
+    {
+        auto func = [=]<typename Int>(auto&& graph, auto& classes) {
+            auto homvec_out = wl::compute_complex_pathwidth_one_homvec<Int>(graph, graph.number_of_vertices()+plus);
 
-    runs.emplace_back("compute_complex_pathwidth_one_homvec", [=](auto&& graph, auto& classes) {
-        auto homvec_out = wl::compute_complex_pathwidth_one_homvec(graph, graph.number_of_vertices()+plus);
-
-        for (int i = 0; i < homvec_out.size(); i++) {
-            classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
-            uint64_t n = homvec_out.size() -plus-1;
-            for (int j = 0; j <= plus; ++j) {
-                classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j].real()) + "|" + std::to_string(homvec_out[n+j].imag())] += 1;
+            for (int i = 0; i < homvec_out.size(); i++) {
+                classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
+                uint64_t n = homvec_out.size() -plus-1;
+                for (int j = 0; j <= plus; ++j) {
+                    classes["N+"+to_string(j)][to_string(homvec_out[n+j].real()) + "|" + to_string(homvec_out[n+j].imag())] += 1;
+                }
             }
-        } 
-    });
+        };
+        
+        runs.emplace_back("compute_complex_pathwidth_one_homvec<8>", [=](auto&& g, auto& c) {return func.operator()<wl::crt::crtu64t<8>>(g, c);});
+        runs.emplace_back("compute_complex_pathwidth_one_homvec<1>", [=](auto&& g, auto& c) {return func.operator()<int64_t>(g, c);});
+    }
 
 
-    runs.emplace_back("compute_complex_pathwidth_one_homvec(D+Ax)", [=](auto&& graph, auto& classes) {
-        auto homvec_out = wl::compute_complex_pathwidth_one_homvec(graph, graph.number_of_vertices()+plus, /*switch*/ true);
+    runs.emplace_back("compute_complex_pathwidth_one_homvec(D+Ax)<8>", [=](auto&& graph, auto& classes) {
+        using Int = wl::crt::crtu64t<8>;
+        auto homvec_out = wl::compute_complex_pathwidth_one_homvec<Int>(graph, graph.number_of_vertices()+plus, /*switch*/ true);
 
         for (int i = 0; i < homvec_out.size(); i++) {
             classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
             uint64_t n = homvec_out.size() -plus-1;
             for (int j = 0; j <= plus; ++j) {
-                classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j].real()) + "|" + std::to_string(homvec_out[n+j].imag())] += 1;
+                classes["N+"+to_string(j)][to_string(homvec_out[n+j].real()) + "|" + to_string(homvec_out[n+j].imag())] += 1;
             }
         }
         
