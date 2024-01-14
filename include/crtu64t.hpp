@@ -11,7 +11,7 @@
 #include <iostream>
 #include <string>
 
-
+#include <boost/integer/extended_euclidean.hpp>
 
 
 namespace wl {
@@ -110,6 +110,22 @@ namespace crt {
             return crtu64t(0ULL) - *this;
         }
 
+        auto operator/=(crtu64t const& other) -> crtu64t& {
+            for (int r = 0; r < R; ++r) {
+                auto [x, y, d] = boost::integer::extended_euclidean(other.mods[r], primes[r]);
+                if (d != 1) {
+                    throw std::runtime_error("Division by zero");
+                }
+                mods[r] = (mods[r] * x) % primes[r];
+            }
+            return *this;
+        }
+
+        friend auto operator/(crtu64t lhs, crtu64t const& rhs) -> crtu64t {
+            lhs /= rhs;
+            return lhs;
+        }
+
         auto operator<=>(crtu64t const& other) const -> std::strong_ordering {
             for (int r = 0; r < R; ++r) {
                 if (mods[r] != other.mods[r]) {
@@ -170,7 +186,7 @@ namespace Eigen {
             RequireInitialization = 1,
             ReadCost = 10 * R,
             AddCost = 10 * R,
-            MulCost = 20 * R
+            MulCost = 14 * R
         };
 
         // // Since it's an integral type, epsilon and precision are not applicable

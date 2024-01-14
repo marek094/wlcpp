@@ -25,6 +25,7 @@
 
 #include "unlabelled_graph.hpp"
 
+#include <boost/math/quaternion.hpp>
 #include <Eigen/Dense>
 
 #include <vector>
@@ -282,7 +283,7 @@ auto compute_poly_path_homvec(SmallGraph graph, SmallGraph::type num_vertices) -
 
 
 template<typename Int = int64_t>
-auto compute_complex_pathwidth_one_homvec(SmallGraph graph, SmallGraph::type num_vertices, bool x_with_A=false) -> std::vector<std::complex<Int>> {
+auto compute_complex_pathwidth_one_homvec(SmallGraph graph, SmallGraph::type num_vertices, bool x_with_A=false, bool boost = false) -> std::vector<std::complex<Int>> {
     auto A = graph.to_adjacency_matrix();
     auto D = graph.to_degree_matrix();
 
@@ -293,24 +294,71 @@ auto compute_complex_pathwidth_one_homvec(SmallGraph graph, SmallGraph::type num
     assert (Ai.rows() == Ai.cols());
     for (int i = 0; i < Ai.rows(); ++i) {
         for (int j = 0; j < Ai.cols(); ++j) {
-
-            if (x_with_A) {
+            if (boost) {
                 if (A(i, j) != 0) {
-                    Ai(i, j) = std::complex<Int>(0, 1);
+                    Ai(i, j) = std::complex<Int>(Int(2)*D(i, j), 0);
                 } else if (i == j) {
-                    Ai(i, j) = std::complex<Int>(D(i, i), 0);
+                    Ai(i, j) = std::complex<Int>(-1, D(i, j));
+                } else {
+                    Ai(i, j) = std::complex<Int>(-1, -1);
                 }
             } else {
-                if (A(i, j) != 0) {
-                    Ai(i, j) = std::complex<Int>(1, 0);
-                } else if (i == j) {
-                    Ai(i, j) = std::complex<Int>(0, D(i, i));
+                if (x_with_A) {
+                    if (A(i, j) != 0) {
+                        Ai(i, j) = std::complex<Int>(0, 1);
+                    } else if (i == j) {
+                        Ai(i, j) = std::complex<Int>(D(i, i), 0);
+                    }
+                } else {
+                    if (A(i, j) != 0) {
+                        Ai(i, j) = std::complex<Int>(1, 0);
+                    } else if (i == j) {
+                        Ai(i, j) = std::complex<Int>(0, D(i, i));
+                    }
                 }
             }
         }
     }
 
     std::vector<std::complex<Int>> homvector;
+    homvector.reserve(num_vertices+1);
+    
+    complex_matrix_t product = complex_matrix_t::Identity(Ai.rows(), Ai.cols());
+    homvector.push_back(product.sum());
+    for (int n = 0; n < num_vertices; ++n) {
+        product = product * Ai;
+        homvector.push_back(product.sum());
+    }
+
+    return homvector;
+}
+
+template<typename Int = int64_t>
+auto compute_quatern_pathwidth_one_homvec(SmallGraph graph, SmallGraph::type num_vertices) {
+    auto A = graph.to_adjacency_matrix();
+    auto D = graph.to_degree_matrix();
+
+    using H = boost::math::quaternion<Int>;
+
+    using complex_matrix_t = Eigen::Matrix<H, Eigen::Dynamic, Eigen::Dynamic>;
+
+    // A to complex<uint64_t>
+    complex_matrix_t Ai = A.cast<H>();
+    assert (Ai.rows() == Ai.cols());
+    for (int i = 0; i < Ai.rows(); ++i) {
+        for (int j = 0; j < Ai.cols(); ++j) {
+
+            if (A(i, j) != 0) {
+                Ai(i, j) = H(1, 0, 0, 0);
+            } else if (i == j) {
+                Ai(i, j) = H(0, D(i, i), 0, 0);
+            } else {
+                Ai(i, j) = H(0, 0, 1, 0);
+            }
+        }
+    }
+
+    std::vector<H> homvector;
     homvector.reserve(num_vertices+1);
     
     complex_matrix_t product = complex_matrix_t::Identity(Ai.rows(), Ai.cols());
