@@ -1,10 +1,17 @@
-# file(GLOB SOURCES "*.cpp")
-add_executable(wlcpp main.cpp)
-# add_executable(minorops minorops.cpp)
-# add_executable(disjointpaths disjointpaths.cpp)
-add_executable(genevalformulas genevalformulas.cpp)
-add_executable(hom2logic hom2logic.cpp)
-add_executable(freetypes freetypes.cpp)
-add_executable(justpaths justpaths.cpp)
-add_executable(tables tables.cpp)
-add_executable(complex_approx complex_approx.cpp)
+# List all your source files
+set(SOURCE_FILES main.cpp genevalformulas.cpp hom2logic.cpp freetypes.cpp justpaths.cpp tables.cpp complex_approx.cpp)
+
+# Find the required Boost components
+find_package(Boost REQUIRED COMPONENTS serialization)
+
+# Loop over the source files
+foreach(source_file ${SOURCE_FILES})
+    # Get the filename without the extension
+    get_filename_component(executable_name ${source_file} NAME_WE)
+
+    # Add an executable for this source file
+    add_executable(${executable_name} ${source_file})
+
+    # Link the Boost libraries to the executable
+    target_link_libraries(${executable_name} Boost::boost Boost::serialization)  # Replace Boost::boost with the required Boost components
+endforeach()

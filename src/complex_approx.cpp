@@ -9,6 +9,13 @@
 #include <ska/unordered_map.hpp>
 #include <omp.h>
 
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/string.hpp>
+#include <boost/serialization/utility.hpp>
+
+
 #include <iostream>
 #include <vector>
 #include <algorithm>
@@ -23,22 +30,20 @@
 #include <sstream>
 #include <ranges>
 #include <unordered_set>
+#include <regex>
 
-
+using classes_update_t = std::vector<std::pair<std::string, std::string>>;
 using hashmap_t = ska::unordered_map<std::string, std::vector<int>>;
 using map_hashmap_t = std::map<std::string, hashmap_t>;
 using vecmap_hashmap_t = std::vector<map_hashmap_t>;
 
 using namespace std::string_literals;
+using std::to_string;
 
-
-struct config_t {
-    int plus = 0;
-};
 
 
 template<typename InpFunc, typename ThreadFunc>
-auto run_relation(std::string name, InpFunc get_graph_list, ThreadFunc&& thread_func, bool verbose=true, bool parallel = true) -> std::pair<std::string, hashmap_t> {
+auto run_relation(std::string name, InpFunc get_graph_list, ThreadFunc&& thread_func, bool verbose = true, bool parallel = true) -> std::pair<std::string, hashmap_t> {
     std::ostringstream sout_quiet;
     auto& sout = (verbose ?  std::cout : sout_quiet);
 
@@ -46,11 +51,9 @@ auto run_relation(std::string name, InpFunc get_graph_list, ThreadFunc&& thread_
     auto start = std::chrono::high_resolution_clock::now();
 
     auto par_classes = vecmap_hashmap_t{};
-
-    // get omp parallel threads count 
-    int num_threads = omp_get_max_threads();
-    par_classes.resize(num_threads);
-
+    unsigned num_pars = (parallel ? omp_get_max_threads() : 1u);
+    par_classes.resize(num_pars);
+    
     {
         auto&& graph_list = get_graph_list();
         sout << "Read " << graph_list.size() << " graphs.\n";
@@ -62,7 +65,8 @@ auto run_relation(std::string name, InpFunc get_graph_list, ThreadFunc&& thread_
             auto classes_update = thread_func(graph_list[i]);
 
             for (auto&& [str1, str2] : classes_update) {
-                par_classes[omp_get_thread_num()][str1][str2].push_back(i);
+                unsigned par_idx = (parallel ? omp_get_thread_num() : 0);
+                par_classes[par_idx][str1][str2].push_back(i);
             }
 
             if (i % percent == percent-1) {
@@ -106,6 +110,115 @@ auto run_relation(std::string name, InpFunc get_graph_list, ThreadFunc&& thread_
 
 
 
+auto call_path_homvec(wl::SmallGraph& graph) -> classes_update_t {
+    int plus = 9;
+    using Int = int64_t;
+    auto homvec_out = wl::compute_path_homvec(graph, graph.number_of_vertices()+ plus);
+
+    auto classes_update = classes_update_t{};
+    classes_update.emplace_back("   ", wl::stringyfy_vector(homvec_out));
+
+    Int n = homvec_out.size() -plus-1;
+    Int sum_odd = 0;
+    Int sum_even = 0;
+    for (int j = 0; j < homvec_out.size()-plus; ++j) {
+        if (j % 2 == 0) {
+            sum_even += homvec_out[j];
+        } else {
+            sum_odd += homvec_out[j];
+        }
+    }
+    for (int j = 0; j <= plus; ++j) {
+        if ((n+j) % 2 == 0) {
+            sum_even += homvec_out[n+j];
+        } else {
+            sum_odd += homvec_out[n+j];
+        }
+        classes_update.emplace_back("yN+"+to_string(j), to_string(sum_even) + "|" + to_string(sum_odd));
+    }
+
+    return classes_update;
+}
+
+template<typename Int>
+auto call_complex_path_homvec_log(wl::SmallGraph& graph) -> classes_update_t {
+    int plus = 9;
+    auto homvec_out = wl::compute_complex_path_homvec_log<Int>(graph, graph.number_of_vertices()+plus);
+            
+    auto classes_update = classes_update_t{};
+    classes_update.emplace_back("   ", wl::stringyfy_vector(homvec_out));
+    return classes_update;
+}
+
+
+template<typename Int>
+auto call_complex_path_homvec(wl::SmallGraph& graph) -> classes_update_t {
+    int plus = 9;
+    auto homvec_out = wl::compute_complex_path_homvec<Int>(graph, graph.number_of_vertices()+14);
+
+    auto classes_update = classes_update_t{};        
+    // classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
+    classes_update.emplace_back("   ", wl::stringyfy_vector(homvec_out));
+    uint64_t n = homvec_out.size() -plus-1;
+    for (int j = 0; j <= plus; ++j) {
+        // classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j].real()) + "|" + std::to_string(homvec_out[n+j].imag())] += 1;
+        classes_update.emplace_back("N+"+to_string(j), to_string(homvec_out[n+j].real()) + "|" + to_string(homvec_out[n+j].imag()));
+    }
+
+    return classes_update;
+}
+
+
+template<typename InpFunc, typename SubFunc, typename SubSubFunc>
+void check_relation(std::vector<std::vector<int>> const& relation_vec,
+                    InpFunc&& get_graph_list,
+                    std::string const& sub_name, SubFunc&& sub_func,
+                    std::string const& subsub_name, SubSubFunc& subsub_func,
+                    bool do_outer) {
+
+    int percent = std::max(relation_vec.size() / 100, 1UL);
+    #pragma omp parallel for if (do_outer)
+    for (int i = 0; i < relation_vec.size(); ++i) {
+        auto const& graph_idcs = relation_vec[i];
+
+        if (graph_idcs.size() <= 1) {
+            continue;
+        }
+
+        auto graph_list = get_graph_list();
+        auto get_graph_sub_list = [&] {
+            auto result = std::vector<wl::SmallGraph>{};
+            result.reserve(graph_idcs.size());
+            for (auto idx : graph_idcs) result.push_back(graph_list[idx]);
+            return result;
+        };
+
+        auto [sub_output, sub_relation] = run_relation(sub_name, get_graph_sub_list, sub_func, false, !do_outer);
+        if (sub_relation.size() != 1) {
+            auto [subsub_output, subsub_relation] = run_relation(subsub_name, get_graph_sub_list, sub_func, false, false);
+            if (subsub_relation.size() == 1) {
+                std::cout << "\nWOW: a " << i << "-th non singleton class has " << sub_relation.size() << " subclasses:\n";
+                std::cout << "\t\t " << wl::stringyfy_vector(graph_idcs) << " graphs.\n";
+                std::cout << "rep: \n";
+                std::cout << sub_output << "\n";
+                std::cout << "subrep: \n";
+                std::cout << subsub_output << "\n";
+                std::cout << std::flush;
+            } else {
+                std::cout << "\nMOM: a right number of iteration fixed it!\n";
+                // std::cout << "subrep: \n";
+                // std::cout << subsub_output << "\n";
+                std::cout << std::flush;
+            }
+        }
+
+        if (i % percent == percent-1) {
+            std::cout << "%" << std::flush;
+        }
+    }
+    std::cout << std::endl;
+
+}
 
 
 
@@ -159,7 +272,6 @@ int main(int argc, char* argv[]) {
 
     // return 0;
 
-    using std::to_string;
 
 
     if (argc < 2) {
@@ -212,192 +324,80 @@ int main(int argc, char* argv[]) {
         return graph_list;
     };
 
-
-
-    int plus = 9;
     
-    using classes_update_t = std::vector<std::pair<std::string, std::string>>;
     using lambda_func_t = std::function<classes_update_t(wl::SmallGraph&)>;
     std::vector<std::pair<std::string, lambda_func_t>> runs;
 
-    runs.emplace_back("compute_path_homvec", [=](auto&& graph) {
-        using Int = int64_t;
-        auto homvec_out = wl::compute_path_homvec(graph, graph.number_of_vertices()+plus);
-
-        auto classes_update = classes_update_t{};
-        classes_update.emplace_back("   ", wl::stringyfy_vector(homvec_out));
-
-        Int n = homvec_out.size() -plus-1;
-        Int sum_odd = 0;
-        Int sum_even = 0;
-        for (int j = 0; j < homvec_out.size()-plus; ++j) {
-            if (j % 2 == 0) {
-                sum_even += homvec_out[j];
-            } else {
-                sum_odd += homvec_out[j];
-            }
-        }
-        for (int j = 0; j <= plus; ++j) {
-            if ((n+j) % 2 == 0) {
-                sum_even += homvec_out[n+j];
-            } else {
-                sum_odd += homvec_out[n+j];
-            }
-            classes_update.emplace_back("yN+"+to_string(j), to_string(sum_even) + "|" + to_string(sum_odd));
-        }
-
-        return classes_update;
-    });
-
-
-    // runs.emplace_back("compute_path_homvec_labeled", [=](auto&& graph, auto& classes) {
-    //     auto homvec_out = wl::compute_path_homvec_labeled(graph, graph.number_of_vertices()+plus);
-    //     classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
-    // });
-
-
-    runs.emplace_back("compute_complex_path_homvec_log<8>", [=](auto&& graph) {
-        using Int = wl::crt::crtu64t<8>;
-        auto homvec_out = wl::compute_complex_path_homvec_log<Int>(graph, graph.number_of_vertices()+plus);
-                
-        auto classes_update = classes_update_t{};
-        classes_update.emplace_back("   ", wl::stringyfy_vector(homvec_out));
-        return classes_update;
-    });
-
-
-    // // runs.emplace_back("compute_complex_path_homvec(-)", [=](auto&& graph, auto& classes) {
-    // //     auto homvec_out =  wl::compute_complex_path_homvec(graph, graph.number_of_vertices()+plus, -1);
-                
-    // //     classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
-    // //     uint64_t n = homvec_out.size() -plus-1;
-    // //     for (int j = 0; j <= plus; ++j) {
-    // //         classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j].real()) + "|" + std::to_string(homvec_out[n+j].imag())] += 1;
-    // //     }
-    // // });
-
-
-    // runs.emplace_back("compute_complex_path_homvec_boost(B)", [=](auto&& graph, auto& classes) {
-    //     auto homvec_out =  wl::compute_complex_path_homvec_boost(graph, graph.number_of_vertices()+plus);
-                
-    //     classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
-    //     uint64_t n = homvec_out.size() -plus-1;
-    //     for (int j = 0; j <= plus; ++j) {
-    //         classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j].real()) + "|" + std::to_string(homvec_out[n+j].imag())] += 1;
-    //     }
-
-        
-    // });
-
-
-    // runs.emplace_back("compute_complex_pathwidth_one_homvec<8>", [=](auto&& graph) {
-    //     auto homvec_out = wl::compute_complex_pathwidth_one_homvec<wl::crt::crtu64t<8>>(graph, graph.number_of_vertices()+plus);
-    //     auto classes_update = classes_update_t{};
-    //     classes_update.emplace_back("   ", wl::stringyfy_vector(homvec_out));
-    //     return classes_update;
-    // });
-
-
-    // runs.emplace_back("compute_complex_pathwidth_one_homvec(D+Ax)", [=](auto&& graph, auto& classes) {
-    //     auto homvec_out = wl::compute_complex_pathwidth_one_homvec(graph, graph.number_of_vertices()+plus, /*switch*/ true);
-
-    //     for (int i = 0; i < homvec_out.size(); i++) {
-    //         classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
-    //         uint64_t n = homvec_out.size() -plus-1;
-    //         for (int j = 0; j <= plus; ++j) {
-    //             classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j].real()) + "|" + std::to_string(homvec_out[n+j].imag())] += 1;
-    //         }
-    //     }
-        
-    // });
-
-
-    // runs.emplace_back("compute_pathwidth_one_homvec_bases", [=](auto&& graph, auto& classes) {
-    //     long long square = graph.number_of_vertices() * graph.number_of_vertices() / 2;
-    //     auto homvec_out = wl::compute_pathwidth_one_homvec_bases(graph, square, square);
-            
-    //     classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
-    //     uint64_t n = homvec_out.size() -plus-1;
-    // });
-
-
-
-    // runs.emplace_back("compute_pathwidth_one_homvec_v2", [=](auto&& graph) {
-    //     auto [homvec_out, homexpr] = wl::compute_pathwidth_one_homvec_v2(graph, graph.number_of_vertices()+4);
-    //     auto classes_update = classes_update_t{};
-    //     classes_update.emplace_back("   ", wl::stringyfy_vector(homvec_out));
-    //     return classes_update; 
-    // });
-
-
+    runs.emplace_back("compute_path_homvec", call_path_homvec);
+    runs.emplace_back("compute_complex_path_homvec_log<8>", call_complex_path_homvec_log<wl::crt::crtu64t<8>>);
+    runs.emplace_back("compute_complex_path_homvec<8>", call_complex_path_homvec<wl::crt::crtu64t<8>>);
     auto runs_map = std::map<std::string, lambda_func_t>{runs.begin(), runs.end()};
+
     auto loaded_graph_list = [graphs = get_graph_list()]() mutable -> auto& { return graphs;};
 
     
     // auto name = "compute_complex_pathwidth_one_homvec"s;
     // auto sub_name = "compute_pathwidth_one_homvec_v2"s;
+
     auto name = "compute_complex_path_homvec_log<8>"s;
     auto sub_name = "compute_path_homvec"s;
+    auto subsub_name = "compute_complex_path_homvec<8>"s;
+    auto func = runs_map[name];
+    auto sub_func = runs_map[sub_name];
+    auto subsub_func = runs_map[subsub_name];
 
-
-    auto relation_vec = std::vector<std::vector<int>>{};
-    auto relation_class_sizes = std::map<unsigned long long, unsigned long long>{};
+    auto relation_vec = std::vector<std::pair<std::string, std::vector<int>>>{};
     {
-        auto [empty_output, relation] = run_relation(name, loaded_graph_list, runs_map[name]);
-        relation_vec.reserve(relation.size());
-        for (auto&& [class_string, graph_idcs] : relation) {
-            // std::cout << class_string << " has " << graph_idcs.size() << " graphs: " << wl::stringyfy_vector(graph_idcs) << "\n";
-            relation_class_sizes[graph_idcs.size()] += 1;
-            if (graph_idcs.size() >= 2) {
-                // if (std::unordered_set<long long>{graph_idcs.begin(), graph_idcs.end()}.size() != graph_idcs.size()) {
-                //     std::cout << "OWO: " << name << " has " << class_string << " with duplicate graphs:\n";
-                //     std::cout << "\t\t " << class_string << " has " << wl::stringyfy_vector(graph_idcs) << " graphs\n";
-                //     return 0;
-                // }
-                relation_vec.emplace_back(std::move(graph_idcs));
-            } 
+
+        // if relation is not cached, compute it
+        // replace(file_path_str.begin(), file_path_str.end(), '/', '__');
+        auto file_path_strR = std::regex_replace(file_path_str, std::regex("/"), "__");
+        auto relation_cache_path = std::filesystem::path("cache") / ("cache___" + file_path_strR + "___" + name + ".bin");
+        if (! exists(relation_cache_path)) {
+            auto [empty_output, relation] = run_relation(name, loaded_graph_list, func, true, true);
+            auto relation_vec = std::vector(std::move_iterator(relation.begin()), std::move_iterator(relation.end()));
+            std::ofstream ofs(relation_cache_path, std::ios::binary);
+            std::cout << "\nFile " << relation_cache_path << " " << (ofs.is_open() ? "opened" : "not opened") << std::endl;
+            boost::archive::binary_oarchive oarch(ofs);
+            oarch << relation_vec;
+            std::cout << "\nSaved " << relation_vec.size() << " classes." << std::endl;
         }
-    }   
+        
+        assert(exists(relation_cache_path));
+
+        {
+            std::ifstream ifs(relation_cache_path, std::ios::binary);
+            boost::archive::binary_iarchive iarch(ifs);
+            iarch >> relation_vec;
+            std::cout << "\nLoaded " << relation_vec.size() << " classes." << std::endl;
+        }
+    }
+
+    auto big_small_th = 4;
+    auto relation_vec_bs = std::array<std::vector<std::vector<int>>, 2>{};
+    auto relation_class_sizes = std::map<unsigned long long, unsigned long long>{};
+
+    for (auto&& [class_string, graph_idcs] : relation_vec) {
+        relation_class_sizes[graph_idcs.size()] += 1;
+        if (graph_idcs.size() >= 2) {
+            bool to_outer = (graph_idcs.size() <= big_small_th);
+            relation_vec_bs[(to_outer ? 0 : 1)].emplace_back(std::move(graph_idcs));
+        }
+    }
+
+    relation_vec.clear();
+    relation_vec.shrink_to_fit();
+
+
 
     std::cout << "These are the sizes of the classes of " << name << ":\n";
     for (auto&& [size, count] : relation_class_sizes) {
-        std::cout << "\t" << size << " : " << count << "\n";
+        std::cout << "\t" << size << " : " << count << std::endl;
     }
 
-    
-
-
-    int percent = std::max(relation_vec.size() / 100, 1UL);
-    #pragma omp parallel for
-    for (int i = 0; i < relation_vec.size(); ++i) {
-        auto&& graph_idcs = relation_vec[i];
-
-        if (graph_idcs.size() <= 1) {
-            continue;
-        }
-
-        auto get_graph_sub_list = [&] {
-            auto result = std::vector<wl::SmallGraph>{};
-            result.reserve(graph_idcs.size());
-            for (auto idx : graph_idcs) result.push_back(get_graph_list()[idx]);
-            return result;
-        };
-
-        auto [sub_output, sub_relation] = run_relation(sub_name, get_graph_sub_list, runs_map[sub_name], false, false);
-        if (sub_relation.size() != 1) {
-            std::cout << "\nWOW: a " << i << "-th non singleton class has " << sub_relation.size() << " subclasses:\n";
-            std::cout << "\t\t " << wl::stringyfy_vector(graph_idcs) << " graphs\n";
-            std::cout << "rep: \n";
-            std::cout << sub_output << "\n";
-            std::cout << std::flush;
-        }
-
-        if (i % percent == percent-1) {
-            std::cout << "%" << std::flush;
-        }
-    }
-    std::cout << std::endl;
-
+    // omp_set_num_threads(8);
+    check_relation(relation_vec_bs[0], get_graph_list, sub_name, sub_func, subsub_name, subsub_func, true);
+    check_relation(relation_vec_bs[1], get_graph_list, sub_name, sub_func, subsub_name, subsub_func, false);
 
 
     return 0;

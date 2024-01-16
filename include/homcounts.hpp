@@ -244,8 +244,17 @@ auto compute_complex_path_homvec_log(SmallGraph graph, SmallGraph::type num_vert
     complex_matrix_t Ai = A.cast<std::complex<Int>>() * std::complex<Int>(0, 1);
     
     // compute ceil(nlog_2n)
-    unsigned long long nlog2n =  std::ceil(n * std::log2(n));
-    return {fast_power<complex_matrix_t>(Ai, nlog2n).sum()};
+    n = 2*n;
+    unsigned long long nlog2n =  std::ceil((n) * std::log2(n));
+    complex_matrix_t powAp0 = fast_power<complex_matrix_t>(Ai, nlog2n);
+    complex_matrix_t powAp1 = powAp0 * Ai;
+    complex_matrix_t powAp2 = powAp1 * Ai;
+    complex_matrix_t powAp3 = powAp2 * Ai;
+
+    // return {powAp0.sum()};
+    // return {powAp0.sum(), powAp1.sum()};
+
+    return {powAp0.sum(), powAp1.sum(), powAp2.sum(), powAp3.sum()};
 }
 
 

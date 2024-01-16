@@ -12,13 +12,10 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g")
 # add -fopenmp
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
 
-include_directories("libs/eigen-3.4.0")
-
 find_package(Boost REQUIRED)
+
+include_directories("libs/eigen-3.4.0")
 include_directories(${Boost_INCLUDE_DIRS})
-
-
-# Include directories
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
 # Add subdirectories
