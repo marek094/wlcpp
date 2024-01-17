@@ -268,8 +268,10 @@ auto compute_complex_path_homvec_log(SmallGraph graph, SmallGraph::type num_vert
     return {powAp0.sum(), powAp1.sum(), powAp2.sum(), powAp3.sum()};
 }
 
+
+
 template<typename Int = int64_t>
-auto compute_complex_path_homvec_qlog(SmallGraph graph, SmallGraph::type num_vertices) -> std::vector<std::complex<Int>> {
+auto compute_complex_path_homvec_qlog(SmallGraph graph, SmallGraph::type) -> std::array<Int, 4> {
     auto A = graph.to_adjacency_matrix();
     auto n = A.rows();
 
@@ -279,9 +281,11 @@ auto compute_complex_path_homvec_qlog(SmallGraph graph, SmallGraph::type num_ver
     // log(n^n) = n log(n)
     unsigned long long t = n*n*4;
     complex_matrix_t powAp0 = fast_power<complex_matrix_t>(Ai, t);
-    // return {powAp0.sum()};
     complex_matrix_t powAp1 = powAp0 * Ai;
-    return {powAp0.sum(), powAp1.sum()};
+
+    auto sum0 = powAp0.sum();
+    auto sum1 = powAp1.sum();
+    return {sum0.real(), sum0.imag(), sum1.real(), sum1.imag()};
 }
 
 

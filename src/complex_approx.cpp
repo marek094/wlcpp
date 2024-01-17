@@ -14,7 +14,7 @@
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/utility.hpp>
-
+#include <boost/serialization/array.hpp>
 
 #include <iostream>
 #include <vector>
@@ -43,17 +43,23 @@ using namespace std::string_literals;
 using std::to_string;
 
 
-
+// std::pair<std::string, std::vector<std::pair<std::string, std::vector<unsigned>>>>
 
 template<typename InpFunc, typename ThreadFunc>
-auto run_relation(std::string name, InpFunc&& get_graph_list, ThreadFunc&& thread_func, bool verbose = true, bool parallel = true) -> std::pair<std::string, std::vector<std::pair<std::string, std::vector<unsigned>>>> {
+auto run_relation(std::string name, InpFunc&& get_graph_list, ThreadFunc&& thread_func, bool verbose = true, bool parallel = true) {
     std::ostringstream sout_quiet;
     auto& sout = (verbose ?  std::cout : sout_quiet);
     // timer 
     auto start = std::chrono::high_resolution_clock::now();
 
+
+    // vectore of {"modification name", "string of this representation"}
+    using return_update_vec = decltype(thread_func(std::declval<wl::SmallGraph>()));
+    using return_key_t = typename return_update_vec::value_type::second_type;
+
+
     // --------------- for thread - for aggr-type ------- for group by std::string
-    auto par_classes = std::vector< std::map<std::string, std::vector< std::pair<std::string, unsigned>>>>{};
+    auto par_classes = std::vector< std::map<std::string, std::vector< std::pair<return_key_t, unsigned>>>>{};
     unsigned num_pars = (parallel ? omp_get_max_threads() : 1u);
     par_classes.resize(num_pars);
     {
@@ -64,7 +70,7 @@ auto run_relation(std::string name, InpFunc&& get_graph_list, ThreadFunc&& threa
         #pragma omp parallel for if (parallel)
         for (unsigned i = 0; i < graph_list.size(); i++) {
             auto g = wl::graph6_to_graph(graph_list[i]);
-            auto classes_update = thread_func(g);
+            std::vector<std::pair<std::string, return_key_t>> classes_update = thread_func(g);
 
             for (auto&& [str1, str2] : classes_update) {
                 unsigned par_idx = (parallel ? omp_get_thread_num() : 0);
@@ -93,18 +99,18 @@ auto run_relation(std::string name, InpFunc&& get_graph_list, ThreadFunc&& threa
     sout << std::endl;
     
     // merge
-    auto classes = std::map<std::string, std::vector< std::pair<std::string, std::vector<unsigned>>>>{};
+    auto classes = std::map<std::string, std::vector< std::pair<return_key_t, std::vector<unsigned>>>>{};
     for (auto&& [key, vec_pairs0] : par_classes.front()) {
-        classes[key] = std::vector< std::pair<std::string, std::vector<unsigned> >>{};
+        classes[key] = std::vector< std::pair<return_key_t, std::vector<unsigned> >>{};
         auto&& classes_key = classes[key];
 
-        auto iterators = std::vector<std::vector<std::pair<std::string, unsigned>>::iterator>{};
+        auto iterators = std::vector<typename std::vector<std::pair<return_key_t, unsigned>>::iterator>{};
         for (int i = 0; i < par_classes.size(); ++i) {
             iterators.push_back(par_classes[i][key].begin());
         }
 
         while (true) {
-            std::string* smallest_string_ptr = nullptr;
+            return_key_t const* smallest_string_ptr = nullptr;
             for (int j = 0; j < par_classes.size(); ++j) {
                 auto&& vec_pairsJ = par_classes[j][key];
                 if (iterators[j] != vec_pairsJ.end()) {
@@ -123,7 +129,7 @@ auto run_relation(std::string name, InpFunc&& get_graph_list, ThreadFunc&& threa
                 auto&& vec_pairsJ = par_classes[j][key];
                 while (iterators[j] != vec_pairsJ.end() && iterators[j]->first == classes_key.back().first) {
                     classes_key.back().second.push_back(iterators[j]->second);
-                    iterators[j]->first = std::string{}; // clear to save some tiny memory
+                    iterators[j]->first = return_key_t{}; // clear to save some tiny memory
                     iterators[j] += 1;
                 }
             }
@@ -139,7 +145,8 @@ auto run_relation(std::string name, InpFunc&& get_graph_list, ThreadFunc&& threa
     sout << "\n\n\n";
 
     // return the main relation
-    return {sout_quiet.str(), classes.begin()->second};
+    // return std::pair<std::string, std::vector<std::pair<return_key_t, unsigned>>>{sout_quiet.str(), classes.begin()->second};
+    return std::make_pair(sout_quiet.str(), classes.begin()->second);
 }
 
 
@@ -186,13 +193,9 @@ auto call_complex_path_homvec_log(wl::SmallGraph const& graph) -> classes_update
 }
 
 template<typename Int>
-auto call_complex_path_homvec_qlog(wl::SmallGraph const& graph) -> classes_update_t {
-    int plus = 9;
-    auto homvec_out = wl::compute_complex_path_homvec_qlog<Int>(graph, graph.number_of_vertices()+plus);
-            
-    auto classes_update = classes_update_t{};
-    classes_update.emplace_back("   ", wl::stringyfy_vector(homvec_out));
-    return classes_update;
+auto call_complex_path_homvec_qlog(wl::SmallGraph const& graph) {
+    auto homvec_out = wl::compute_complex_path_homvec_qlog<Int>(graph, 0);
+    return std::vector({std::pair{"   "s, homvec_out}});
 }
 
 
@@ -405,24 +408,27 @@ int main(int argc, char* argv[]) {
     };
 
     
-    using lambda_func_t = std::function<classes_update_t(wl::SmallGraph const&)>;
+    // using lambda_func_t = std::function<classes_update_t(wl::SmallGraph const&)>;
 
     // auto name = "compute_complex_path_homvec_log<8>"s;
     // lambda_func_t func = call_complex_path_homvec_log<wl::crt::crtu64t<8>>;
     auto name = "compute_complex_path_homvec_qlog<8>"s;
-    lambda_func_t func = call_complex_path_homvec_qlog<wl::crt::crtu64t<8>>;
+    auto func = call_complex_path_homvec_qlog<wl::crt::crtu64t<8>>;
 
     auto sub_name = "compute_path_homvec"s;
-    lambda_func_t sub_func = call_path_homvec;
+    auto sub_func = call_path_homvec;
 
     auto subsub_name = "compute_complex_path_homvec<8>"s;
-    lambda_func_t subsub_func = call_complex_path_homvec<wl::crt::crtu64t<8>>;
+    auto subsub_func = call_complex_path_homvec<wl::crt::crtu64t<8>>;
 
 
 
     auto loaded_graph_list = [graphs = get_graph_list()]() mutable -> std::vector<std::string>& { return graphs;};
 
-    auto relation_vec = std::vector<std::pair<std::string, std::vector<int>>>{};
+    using return_update_vec = decltype(func(std::declval<wl::SmallGraph>()));
+    using return_key_t = typename return_update_vec::value_type::second_type;
+
+    auto relation_vec = std::vector<std::pair<return_key_t, std::vector<int>>>{};
     {
         auto relation_cache_path = std::filesystem::path("cache") / std::format("cache___{}___{}.bin", replaced_name, name);
         if (! exists(relation_cache_path)) {

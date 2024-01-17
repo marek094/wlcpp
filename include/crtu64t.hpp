@@ -164,6 +164,10 @@ namespace crt {
             return res;
         }
 
+        // boost/serialization
+        auto serialize(auto& ar, unsigned) -> void {
+            ar & mods;
+        }
 
         std::array<ull, R> mods;
     };
