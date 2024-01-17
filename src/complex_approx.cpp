@@ -63,7 +63,8 @@ auto run_relation(std::string name, InpFunc&& get_graph_list, ThreadFunc&& threa
 
         #pragma omp parallel for if (parallel)
         for (unsigned i = 0; i < graph_list.size(); i++) {
-            auto classes_update = thread_func(graph_list[i]);
+            auto g = wl::graph6_to_graph(graph_list[i]);
+            auto classes_update = thread_func(g);
 
             for (auto&& [str1, str2] : classes_update) {
                 unsigned par_idx = (parallel ? omp_get_thread_num() : 0);
@@ -144,7 +145,7 @@ auto run_relation(std::string name, InpFunc&& get_graph_list, ThreadFunc&& threa
 
 
 
-auto call_path_homvec(wl::SmallGraph& graph) -> classes_update_t {
+auto call_path_homvec(wl::SmallGraph const& graph) -> classes_update_t {
     int plus = 9;
     using Int = int64_t;
     auto homvec_out = wl::compute_path_homvec(graph, graph.number_of_vertices()+ plus);
@@ -175,7 +176,7 @@ auto call_path_homvec(wl::SmallGraph& graph) -> classes_update_t {
 }
 
 template<typename Int>
-auto call_complex_path_homvec_log(wl::SmallGraph& graph) -> classes_update_t {
+auto call_complex_path_homvec_log(wl::SmallGraph const& graph) -> classes_update_t {
     int plus = 9;
     auto homvec_out = wl::compute_complex_path_homvec_log<Int>(graph, graph.number_of_vertices()+plus);
             
@@ -185,7 +186,7 @@ auto call_complex_path_homvec_log(wl::SmallGraph& graph) -> classes_update_t {
 }
 
 template<typename Int>
-auto call_complex_path_homvec_qlog(wl::SmallGraph& graph) -> classes_update_t {
+auto call_complex_path_homvec_qlog(wl::SmallGraph const& graph) -> classes_update_t {
     int plus = 9;
     auto homvec_out = wl::compute_complex_path_homvec_qlog<Int>(graph, graph.number_of_vertices()+plus);
             
@@ -196,7 +197,7 @@ auto call_complex_path_homvec_qlog(wl::SmallGraph& graph) -> classes_update_t {
 
 
 template<typename Int>
-auto call_complex_path_homvec(wl::SmallGraph& graph) -> classes_update_t {
+auto call_complex_path_homvec(wl::SmallGraph const& graph) -> classes_update_t {
     int plus = 9;
     auto homvec_out = wl::compute_complex_path_homvec<Int>(graph, graph.number_of_vertices()+14);
 
@@ -231,9 +232,11 @@ void check_relation(std::vector<std::vector<int>> const& relation_vec,
         }
 
         auto get_graph_sub_list = [&] {
-            auto result = std::vector<wl::SmallGraph>{};
+            auto result = std::vector<std::string>{};
             result.reserve(graph_idcs.size());
-            for (auto idx : graph_idcs) result.push_back(graph_list[idx]);
+            for (auto idx : graph_idcs) {
+                result.emplace_back(graph_list[idx]);
+            }
             return result;
         };
 
@@ -348,34 +351,61 @@ int main(int argc, char* argv[]) {
     std::string file_path_str = argv[1];
     std::string replaced_name = std::regex_replace(file_path_str, std::regex("/"), "__");
 
-    auto get_graph_list = [=]() -> std::vector<wl::SmallGraph> {
-        std::istringstream iss(file_path_str);
-        auto graph_list = std::vector<wl::SmallGraph>{};
-        for (std::string token; std::getline(iss, token, ' '); ) {
-            std::filesystem::path file_path = token;
+    // auto get_graph_list = [=]() -> std::vector<wl::SmallGraph> {
+    //     std::istringstream iss(file_path_str);
+    //     auto graph_list = std::vector<wl::SmallGraph>{};
+    //     for (std::string token; std::getline(iss, token, ' '); ) {
+    //         std::filesystem::path file_path = token;
             
-            if (file_path.extension() == ".txt" && file_path.stem().string().substr(0, 4) == "tree") {    
-                auto r = wl::read_graph_from_tree_txt_file(file_path, limit, skip);
-            } else
-            if (file_path.extension() == ".txt") {
-                auto r = wl::read_graph_from_labeled_txt_file(file_path, limit, skip);
-            }
-            assert(file_path.extension() == ".g6");
-            auto r = wl::read_graph_from_graph6_file(file_path, limit, skip);
-            if (graph_list.empty()) {
-                graph_list = std::move(r);
-            } else {
-                graph_list.insert(graph_list.end(), r.begin(), r.end());
+    //         if (file_path.extension() == ".txt" && file_path.stem().string().substr(0, 4) == "tree") {    
+    //             auto r = wl::read_graph_from_tree_txt_file(file_path, limit, skip);
+    //         } else
+    //         if (file_path.extension() == ".txt") {
+    //             auto r = wl::read_graph_from_labeled_txt_file(file_path, limit, skip);
+    //         }
+    //         assert(file_path.extension() == ".g6");
+    //         auto r = wl::read_graph_from_graph6_file(file_path, limit, skip);
+    //         if (graph_list.empty()) {
+    //             graph_list = std::move(r);
+    //         } else {
+    //             graph_list.insert(graph_list.end(), r.begin(), r.end());
+    //         }
+    //     }
+    //     return graph_list;
+    // };
+
+
+    auto get_graph_list = [=]() -> std::vector<std::string> {
+        std::istringstream iss(file_path_str);
+        auto graph_list = std::vector<std::string>{};
+        for (std::string token; std::getline(iss, token, ' '); ) {
+            std::ifstream file(token);
+            std::string line;
+
+            int skipper_i = 0;
+            while (std::getline(file, line)) {
+                if (skipper_i++ < skip) {
+                    continue;
+                } else {
+                    skipper_i = 0;
+                }
+
+                if (line.substr(0, 10) == ">>graph6<<") {
+                    graph_list.emplace_back(line.substr(10));
+                } else {
+                    graph_list.emplace_back(line);
+                }
+                if (graph_list.size() >= limit) {
+                    break;
+                }
+
             }
         }
         return graph_list;
     };
-    // auto get_graph_list = [=]() -> std::vector<std::string> {
-    //     std::filesystem::path file_path = token;
-    // };
 
     
-    using lambda_func_t = std::function<classes_update_t(wl::SmallGraph&)>;
+    using lambda_func_t = std::function<classes_update_t(wl::SmallGraph const&)>;
 
     // auto name = "compute_complex_path_homvec_log<8>"s;
     // lambda_func_t func = call_complex_path_homvec_log<wl::crt::crtu64t<8>>;
@@ -390,7 +420,7 @@ int main(int argc, char* argv[]) {
 
 
 
-    auto loaded_graph_list = [graphs = get_graph_list()]() mutable -> auto& { return graphs;};
+    auto loaded_graph_list = [graphs = get_graph_list()]() mutable -> std::vector<std::string>& { return graphs;};
 
     auto relation_vec = std::vector<std::pair<std::string, std::vector<int>>>{};
     {
