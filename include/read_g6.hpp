@@ -197,6 +197,16 @@ auto read_graph_from_graph6_file(std::string const& filename, size_t limit = (~0
     return graphs;
 }
 
+auto read_graph_from_sparse6_file(std::string const& filename, size_t limit = (~0), size_t skip = 0) -> std::vector<SmallGraph> {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open the file: " << filename << '\n';
+        return {};
+    }
+
+    std::cerr << "Not implemented yet\n";
+    return {};
+}
 
 
 } // namespace wl

@@ -6,7 +6,7 @@
 #include "explain.hpp"
 #include "crtu64t.hpp"
 
-#include <ska/unordered_map.hpp>
+// #include <ska/unordered_map.hpp>
 #include <omp.h>
 
 #include <boost/archive/binary_iarchive.hpp>
@@ -34,23 +34,26 @@
 
 
 using classes_update_t = std::vector<std::pair<std::string, std::string>>;
-using hashmap_t = ska::unordered_map<std::string, std::vector<int>>;
-using map_hashmap_t = std::map<std::string, hashmap_t>;
-using vecmap_hashmap_t = std::vector<map_hashmap_t>;
+// using hashmap_t = ska::unordered_map<std::string, std::vector<int>>;
+// using map_hashmap_t = std::map<std::string, hashmap_t>;
+// using vecmap_hashmap_t = std::vector<map_hashmap_t>;
+using ull = unsigned long long;
 
 using namespace std::string_literals;
 using std::to_string;
 
 
 
+
 template<typename InpFunc, typename ThreadFunc>
-auto run_relation(std::string name, InpFunc&& get_graph_list, ThreadFunc&& thread_func, bool verbose = true, bool parallel = true) -> std::pair<std::string, hashmap_t> {
+auto run_relation(std::string name, InpFunc&& get_graph_list, ThreadFunc&& thread_func, bool verbose = true, bool parallel = true) -> std::pair<std::string, std::vector<std::pair<std::string, std::vector<unsigned>>>> {
     std::ostringstream sout_quiet;
     auto& sout = (verbose ?  std::cout : sout_quiet);
     // timer 
     auto start = std::chrono::high_resolution_clock::now();
 
-    auto par_classes = vecmap_hashmap_t{};
+    // --------------- for thread - for aggr-type ------- for group by std::string
+    auto par_classes = std::vector< std::map<std::string, std::vector< std::pair<std::string, unsigned>>>>{};
     unsigned num_pars = (parallel ? omp_get_max_threads() : 1u);
     par_classes.resize(num_pars);
     {
@@ -59,12 +62,16 @@ auto run_relation(std::string name, InpFunc&& get_graph_list, ThreadFunc&& threa
         int percent = std::max(graph_list.size() / 100, 1UL);
 
         #pragma omp parallel for if (parallel)
-        for (int i = 0; i < graph_list.size(); i++) {
+        for (unsigned i = 0; i < graph_list.size(); i++) {
             auto classes_update = thread_func(graph_list[i]);
 
             for (auto&& [str1, str2] : classes_update) {
                 unsigned par_idx = (parallel ? omp_get_thread_num() : 0);
-                par_classes[par_idx][str1][str2].push_back(i);
+                auto& vec = par_classes[par_idx][str1];
+                if (vec.empty()) {
+                    vec.reserve(graph_list.size() / num_pars + 64);
+                }
+                vec.emplace_back(std::move(str2), i);
             }
 
             if (i % percent == percent-1) {
@@ -74,25 +81,54 @@ auto run_relation(std::string name, InpFunc&& get_graph_list, ThreadFunc&& threa
         
         sout << "\nDone with computation" << std::endl;
     }
-    
-    // aggregate classes 
-    auto& classes = par_classes.front();
-    {
-        for (int i = 1; i < par_classes.size(); ++i) {
-            for (auto &&[key, value] : par_classes[i]) {
-                for (auto &&[key2, value2] : value) {
-                    auto &vec = classes[key][key2];
-                    vec.insert(vec.end(), value2.begin(), value2.end());
-                }
-            }
-            sout << "/" << std::flush;
 
-            // make the space available in par_classes[i]
-            par_classes[i] = map_hashmap_t{};
+    #pragma omp parallel for if (parallel)
+    for (int i = 0; i < par_classes.size(); ++i) {
+        for (auto &&[key, value] : par_classes[i]) {
+            std::sort(value.begin(), value.end());
+        }
+        sout << "/" << std::flush;
+    }
+    sout << std::endl;
+    
+    // merge
+    auto classes = std::map<std::string, std::vector< std::pair<std::string, std::vector<unsigned>>>>{};
+    for (auto&& [key, vec_pairs0] : par_classes.front()) {
+        classes[key] = std::vector< std::pair<std::string, std::vector<unsigned> >>{};
+        auto&& classes_key = classes[key];
+
+        auto iterators = std::vector<std::vector<std::pair<std::string, unsigned>>::iterator>{};
+        for (int i = 0; i < par_classes.size(); ++i) {
+            iterators.push_back(par_classes[i][key].begin());
         }
 
-        sout << "\nDone with aggregation" << std::endl;
+        while (true) {
+            std::string* smallest_string_ptr = nullptr;
+            for (int j = 0; j < par_classes.size(); ++j) {
+                auto&& vec_pairsJ = par_classes[j][key];
+                if (iterators[j] != vec_pairsJ.end()) {
+                    if (!smallest_string_ptr || iterators[j]->first < *smallest_string_ptr) {
+                        smallest_string_ptr = &(iterators[j]->first);
+                    }
+                }
+            }
+
+            if (!smallest_string_ptr) {
+                break;
+            }
+            
+            classes_key.emplace_back(*smallest_string_ptr, std::vector<unsigned>{});
+            for (int j = 0; j < par_classes.size(); ++j) {
+                auto&& vec_pairsJ = par_classes[j][key];
+                while (iterators[j] != vec_pairsJ.end() && iterators[j]->first == classes_key.back().first) {
+                    classes_key.back().second.push_back(iterators[j]->second);
+                    iterators[j]->first = std::string{}; // clear to save some tiny memory
+                    iterators[j] += 1;
+                }
+            }
+        }
     }
+
 
     auto end = std::chrono::high_resolution_clock::now();
     sout << "\n\t " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms";
@@ -142,6 +178,16 @@ template<typename Int>
 auto call_complex_path_homvec_log(wl::SmallGraph& graph) -> classes_update_t {
     int plus = 9;
     auto homvec_out = wl::compute_complex_path_homvec_log<Int>(graph, graph.number_of_vertices()+plus);
+            
+    auto classes_update = classes_update_t{};
+    classes_update.emplace_back("   ", wl::stringyfy_vector(homvec_out));
+    return classes_update;
+}
+
+template<typename Int>
+auto call_complex_path_homvec_qlog(wl::SmallGraph& graph) -> classes_update_t {
+    int plus = 9;
+    auto homvec_out = wl::compute_complex_path_homvec_qlog<Int>(graph, graph.number_of_vertices()+plus);
             
     auto classes_update = classes_update_t{};
     classes_update.emplace_back("   ", wl::stringyfy_vector(homvec_out));
@@ -324,12 +370,17 @@ int main(int argc, char* argv[]) {
         }
         return graph_list;
     };
+    // auto get_graph_list = [=]() -> std::vector<std::string> {
+    //     std::filesystem::path file_path = token;
+    // };
 
     
     using lambda_func_t = std::function<classes_update_t(wl::SmallGraph&)>;
 
-    auto name = "compute_complex_path_homvec_log<8>"s;
-    lambda_func_t func = call_complex_path_homvec_log<wl::crt::crtu64t<8>>;
+    // auto name = "compute_complex_path_homvec_log<8>"s;
+    // lambda_func_t func = call_complex_path_homvec_log<wl::crt::crtu64t<8>>;
+    auto name = "compute_complex_path_homvec_qlog<8>"s;
+    lambda_func_t func = call_complex_path_homvec_qlog<wl::crt::crtu64t<8>>;
 
     auto sub_name = "compute_path_homvec"s;
     lambda_func_t sub_func = call_path_homvec;
@@ -345,8 +396,8 @@ int main(int argc, char* argv[]) {
     {
         auto relation_cache_path = std::filesystem::path("cache") / std::format("cache___{}___{}.bin", replaced_name, name);
         if (! exists(relation_cache_path)) {
-            auto [empty_output, relation] = run_relation(name, loaded_graph_list, func, true, true);
-            auto relation_vec = std::vector(std::move_iterator(relation.begin()), std::move_iterator(relation.end()));
+            auto [empty_output, relation_vec] = run_relation(name, loaded_graph_list, func, true, true);
+            // auto relation_vec = std::vector(std::move_iterator(relation.begin()), std::move_iterator(relation.end()));
             std::ofstream ofs(relation_cache_path, std::ios::binary);
             std::cout << "\nFile " << relation_cache_path << " " << (ofs.is_open() ? "opened" : "not opened") << std::endl;
             boost::archive::binary_oarchive oarch(ofs);

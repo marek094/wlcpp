@@ -131,15 +131,19 @@ int main(int argc, char* argv[]) {
         auto graph_list = std::vector<wl::SmallGraph>{};
         for (std::string token; std::getline(iss, token, ' '); ) {
             std::filesystem::path file_path = token;
-            
+            auto r = std::vector<wl::SmallGraph>{};
             if (file_path.extension() == ".txt" && file_path.stem().string().substr(0, 4) == "tree") {    
-                auto r = wl::read_graph_from_tree_txt_file(file_path, limit, skip);
-            } else
-            if (file_path.extension() == ".txt") {
-                auto r = wl::read_graph_from_labeled_txt_file(file_path, limit, skip);
+                r = wl::read_graph_from_tree_txt_file(file_path, limit, skip);
+            } else if (file_path.extension() == ".txt") {
+                r = wl::read_graph_from_labeled_txt_file(file_path, limit, skip);
+            } else if (file_path.extension() == ".g6") {
+                r = wl::read_graph_from_graph6_file(file_path, limit, skip);
+            } else if (file_path.extension() == ".is6") {
+                r = wl::read_graph_from_sparse6_file(file_path, limit, skip);
+            } else {
+                std::cerr << "Unknown file extension: " << file_path.extension() << std::endl;
             }
-            assert(file_path.extension() == ".g6");
-            auto r = wl::read_graph_from_graph6_file(file_path, limit, skip);
+
             if (graph_list.empty()) {
                 graph_list = std::move(r);
             } else {

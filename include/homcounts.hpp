@@ -233,6 +233,17 @@ Matrix fast_power(Matrix base, unsigned long long exponent) {
     return result;
 }
 
+template<typename Matrix>
+Matrix fast_even_power(Matrix base, unsigned long long num_iterators) {
+    assert (num_iterators > 0);
+
+    Matrix result = base;
+    for (int i = 0; i < num_iterators; ++i) {
+        result = result * result;
+    }
+
+    return result;
+}
 
 
 template<typename Int = int64_t>
@@ -257,18 +268,21 @@ auto compute_complex_path_homvec_log(SmallGraph graph, SmallGraph::type num_vert
     return {powAp0.sum(), powAp1.sum(), powAp2.sum(), powAp3.sum()};
 }
 
-// template<typename Int = int64_t>
-// auto compute_complex_path_homvec_qlog(SmallGraph graph, SmallGraph::type num_vertices) -> std::vector<std::complex<Int>> {
-//     auto A = graph.to_adjacency_matrix();
-//     auto n = A.rows();
+template<typename Int = int64_t>
+auto compute_complex_path_homvec_qlog(SmallGraph graph, SmallGraph::type num_vertices) -> std::vector<std::complex<Int>> {
+    auto A = graph.to_adjacency_matrix();
+    auto n = A.rows();
 
-//     using complex_matrix_t = Eigen::Matrix<std::complex<Int>, Eigen::Dynamic, Eigen::Dynamic>;
-//     complex_matrix_t Ai = A.cast<std::complex<Int>>() * std::complex<Int>(0, 1);
+    using complex_matrix_t = Eigen::Matrix<std::complex<Int>, Eigen::Dynamic, Eigen::Dynamic>;
+    complex_matrix_t Ai = A.cast<std::complex<Int>>() * std::complex<Int>(0, 1);
     
-//     unsigned long long t =  std::ceil((n) * std::log2(n));
-//     complex_matrix_t powAp0 = fast_power<complex_matrix_t>(Ai, nlog2n);
-//     return {powAp0.sum(), powAp1.sum(), powAp2.sum(), powAp3.sum()};
-// }
+    // log(n^n) = n log(n)
+    unsigned long long t = n*n*4;
+    complex_matrix_t powAp0 = fast_power<complex_matrix_t>(Ai, t);
+    // return {powAp0.sum()};
+    complex_matrix_t powAp1 = powAp0 * Ai;
+    return {powAp0.sum(), powAp1.sum()};
+}
 
 
 
