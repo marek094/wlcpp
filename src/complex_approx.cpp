@@ -32,6 +32,7 @@
 #include <unordered_set>
 #include <regex>
 
+
 using classes_update_t = std::vector<std::pair<std::string, std::string>>;
 using hashmap_t = ska::unordered_map<std::string, std::vector<int>>;
 using map_hashmap_t = std::map<std::string, hashmap_t>;
@@ -43,25 +44,22 @@ using std::to_string;
 
 
 template<typename InpFunc, typename ThreadFunc>
-auto run_relation(std::string name, InpFunc get_graph_list, ThreadFunc&& thread_func, bool verbose = true, bool parallel = true) -> std::pair<std::string, hashmap_t> {
+auto run_relation(std::string name, InpFunc&& get_graph_list, ThreadFunc&& thread_func, bool verbose = true, bool parallel = true) -> std::pair<std::string, hashmap_t> {
     std::ostringstream sout_quiet;
     auto& sout = (verbose ?  std::cout : sout_quiet);
-
     // timer 
     auto start = std::chrono::high_resolution_clock::now();
 
     auto par_classes = vecmap_hashmap_t{};
     unsigned num_pars = (parallel ? omp_get_max_threads() : 1u);
     par_classes.resize(num_pars);
-    
     {
-        auto&& graph_list = get_graph_list();
+        auto graph_list = get_graph_list();
         sout << "Read " << graph_list.size() << " graphs.\n";
         int percent = std::max(graph_list.size() / 100, 1UL);
 
         #pragma omp parallel for if (parallel)
         for (int i = 0; i < graph_list.size(); i++) {
-            // sout << "X" << std::endl;
             auto classes_update = thread_func(graph_list[i]);
 
             for (auto&& [str1, str2] : classes_update) {
@@ -169,13 +167,14 @@ auto call_complex_path_homvec(wl::SmallGraph& graph) -> classes_update_t {
 }
 
 
-template<typename InpFunc, typename SubFunc, typename SubSubFunc>
+template<typename InputFunc, typename SubFunc, typename SubSubFunc>
 void check_relation(std::vector<std::vector<int>> const& relation_vec,
-                    InpFunc&& get_graph_list,
+                    InputFunc&& get_graph_list,
                     std::string const& sub_name, SubFunc&& sub_func,
-                    std::string const& subsub_name, SubSubFunc& subsub_func,
+                    std::string const& subsub_name, SubSubFunc&& subsub_func,
                     bool do_outer) {
-
+                        
+    auto graph_list = get_graph_list();
     int percent = std::max(relation_vec.size() / 100, 1UL);
     #pragma omp parallel for if (do_outer)
     for (int i = 0; i < relation_vec.size(); ++i) {
@@ -185,7 +184,6 @@ void check_relation(std::vector<std::vector<int>> const& relation_vec,
             continue;
         }
 
-        auto graph_list = get_graph_list();
         auto get_graph_sub_list = [&] {
             auto result = std::vector<wl::SmallGraph>{};
             result.reserve(graph_idcs.size());
@@ -194,11 +192,12 @@ void check_relation(std::vector<std::vector<int>> const& relation_vec,
         };
 
         auto [sub_output, sub_relation] = run_relation(sub_name, get_graph_sub_list, sub_func, false, !do_outer);
+
         if (sub_relation.size() != 1) {
             auto [subsub_output, subsub_relation] = run_relation(subsub_name, get_graph_sub_list, sub_func, false, false);
             if (subsub_relation.size() == 1) {
                 std::cout << "\nWOW: a " << i << "-th non singleton class has " << sub_relation.size() << " subclasses:\n";
-                std::cout << "\t\t " << wl::stringyfy_vector(graph_idcs) << " graphs.\n";
+                std::cout << "BadGraphs\t"; for (auto idx : graph_idcs) std::cout << idx << "\t"; std::cout << "\n";
                 std::cout << "rep: \n";
                 std::cout << sub_output << "\n";
                 std::cout << "subrep: \n";
@@ -279,10 +278,11 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    size_t threads = 1;
+    size_t threads = omp_get_max_threads();
     if (argc >= 3) {
-        omp_set_num_threads(std::atoi(argv[2]));
+        threads = std::atoi(argv[2]);
     }
+    omp_set_num_threads(threads);
     
     size_t limit = -1;
     if (argc >= 4) {
@@ -300,6 +300,7 @@ int main(int argc, char* argv[]) {
     }
 
     std::string file_path_str = argv[1];
+    std::string replaced_name = std::regex_replace(file_path_str, std::regex("/"), "__");
 
     auto get_graph_list = [=]() -> std::vector<wl::SmallGraph> {
         std::istringstream iss(file_path_str);
@@ -326,33 +327,23 @@ int main(int argc, char* argv[]) {
 
     
     using lambda_func_t = std::function<classes_update_t(wl::SmallGraph&)>;
-    std::vector<std::pair<std::string, lambda_func_t>> runs;
 
-    runs.emplace_back("compute_path_homvec", call_path_homvec);
-    runs.emplace_back("compute_complex_path_homvec_log<8>", call_complex_path_homvec_log<wl::crt::crtu64t<8>>);
-    runs.emplace_back("compute_complex_path_homvec<8>", call_complex_path_homvec<wl::crt::crtu64t<8>>);
-    auto runs_map = std::map<std::string, lambda_func_t>{runs.begin(), runs.end()};
+    auto name = "compute_complex_path_homvec_log<8>"s;
+    lambda_func_t func = call_complex_path_homvec_log<wl::crt::crtu64t<8>>;
+
+    auto sub_name = "compute_path_homvec"s;
+    lambda_func_t sub_func = call_path_homvec;
+
+    auto subsub_name = "compute_complex_path_homvec<8>"s;
+    lambda_func_t subsub_func = call_complex_path_homvec<wl::crt::crtu64t<8>>;
+
+
 
     auto loaded_graph_list = [graphs = get_graph_list()]() mutable -> auto& { return graphs;};
 
-    
-    // auto name = "compute_complex_pathwidth_one_homvec"s;
-    // auto sub_name = "compute_pathwidth_one_homvec_v2"s;
-
-    auto name = "compute_complex_path_homvec_log<8>"s;
-    auto sub_name = "compute_path_homvec"s;
-    auto subsub_name = "compute_complex_path_homvec<8>"s;
-    auto func = runs_map[name];
-    auto sub_func = runs_map[sub_name];
-    auto subsub_func = runs_map[subsub_name];
-
     auto relation_vec = std::vector<std::pair<std::string, std::vector<int>>>{};
     {
-
-        // if relation is not cached, compute it
-        // replace(file_path_str.begin(), file_path_str.end(), '/', '__');
-        auto file_path_strR = std::regex_replace(file_path_str, std::regex("/"), "__");
-        auto relation_cache_path = std::filesystem::path("cache") / ("cache___" + file_path_strR + "___" + name + ".bin");
+        auto relation_cache_path = std::filesystem::path("cache") / std::format("cache___{}___{}.bin", replaced_name, name);
         if (! exists(relation_cache_path)) {
             auto [empty_output, relation] = run_relation(name, loaded_graph_list, func, true, true);
             auto relation_vec = std::vector(std::move_iterator(relation.begin()), std::move_iterator(relation.end()));
@@ -373,14 +364,14 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    auto big_small_th = 4;
+    auto big_small_th = omp_get_max_threads() * 2;
     auto relation_vec_bs = std::array<std::vector<std::vector<int>>, 2>{};
     auto relation_class_sizes = std::map<unsigned long long, unsigned long long>{};
 
     for (auto&& [class_string, graph_idcs] : relation_vec) {
         relation_class_sizes[graph_idcs.size()] += 1;
         if (graph_idcs.size() >= 2) {
-            bool to_outer = (graph_idcs.size() <= big_small_th);
+            bool to_outer = (graph_idcs.size() < big_small_th);
             relation_vec_bs[(to_outer ? 0 : 1)].emplace_back(std::move(graph_idcs));
         }
     }
@@ -395,10 +386,11 @@ int main(int argc, char* argv[]) {
         std::cout << "\t" << size << " : " << count << std::endl;
     }
 
-    // omp_set_num_threads(8);
-    check_relation(relation_vec_bs[0], get_graph_list, sub_name, sub_func, subsub_name, subsub_func, true);
-    check_relation(relation_vec_bs[1], get_graph_list, sub_name, sub_func, subsub_name, subsub_func, false);
+    check_relation(relation_vec_bs[0], loaded_graph_list, sub_name, sub_func, subsub_name, subsub_func, true);
+    check_relation(relation_vec_bs[1], loaded_graph_list, sub_name, sub_func, subsub_name, subsub_func, false);
 
+
+    std::cout << "Done." << std::endl;
 
     return 0;
 }
