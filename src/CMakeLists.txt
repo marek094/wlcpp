@@ -1,5 +1,5 @@
 # List all your source files
-set(SOURCE_FILES main.cpp genevalformulas.cpp hom2logic.cpp freetypes.cpp justpaths.cpp tables.cpp complex_approx.cpp)
+set(SOURCE_FILES main.cpp genevalformulas.cpp hom2logic.cpp freetypes.cpp justpaths.cpp tables.cpp complex_approx.cpp wl_main.cpp)
 
 # Find the required Boost components
 find_package(Boost REQUIRED COMPONENTS serialization)

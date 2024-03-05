@@ -40,12 +40,23 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <map>
+#include <numeric>
 
 namespace wl {
 
-using rehash_t = std::unordered_map<std::string, unsigned long long>;
-using colvec_t = std::vector<unsigned long long>;
-// auto format = [](auto&&... elems) { return ((std::ostringstream{} << ... << elems)).str(); };
+using ull = unsigned long long;
+using rehash_t = std::unordered_map<std::string, ull>;
+using colvec_t = std::vector<ull>;
+using colvec_num_t = std::vector<std::pair<ull, ull>>;
+
+
+
+template <typename... Args>
+auto str(Args&&... args) -> std::string {
+    return (std::stringstream{} << ... << args).str();
+}
+
 
 template <typename T>
 auto stringyfy_vector(std::vector<T> const& vec) -> std::string {
@@ -55,6 +66,17 @@ auto stringyfy_vector(std::vector<T> const& vec) -> std::string {
     }
     return std::move(ss).str();
 }
+
+template <typename T>
+auto stringyfy_map(T const& m) -> std::string {
+    std::ostringstream ss;
+    for (auto &&[key, value] : m) {
+        ss << key << ":" << value << ",";
+    }
+    return std::move(ss).str();
+}
+
+
 
 auto relabel(std::string const& col, rehash_t& rehash) -> int {
     if (rehash.find(col) == rehash.end()) {
@@ -67,8 +89,10 @@ auto relabel(colvec_t const& col, rehash_t& rehash) -> int {
     return relabel(stringyfy_vector(col), rehash);
 }
 
-auto is_refined(colvec_t const& vec1, colvec_t const& vec2) -> bool {
-    std::unordered_map<unsigned long long, int> rho1, rho2;
+template <typename T, typename U>
+auto is_refined(T const& vec1, U const& vec2) -> bool {
+    std::map<typename T::value_type, int> rho1;
+    std::map<typename U::value_type, int> rho2;
     colvec_t sizes1, sizes2;
     
     for (auto &&value : vec1) {
@@ -119,7 +143,6 @@ auto is_refined(std::vector<colvec_t> const& vec2d1, std::vector<colvec_t> const
 
 
 
-
 auto colors_1(SmallGraph const& graph, rehash_t& rehash, colvec_t const& labels = {}) -> colvec_t {
     auto A = graph.to_adjacency_matrix();
     auto n = A.rows();
@@ -155,6 +178,157 @@ auto colors_1(SmallGraph const& graph, rehash_t& rehash, colvec_t const& labels 
 
     return {};
 }
+
+
+
+auto colors_tw1(SmallGraph const& graph, rehash_t& rehash, colvec_t const& labels = {}) -> colvec_t {
+    auto A = graph.to_adjacency_matrix();
+    auto n = A.rows();
+    
+    auto colvec = (labels.empty()) ? colvec_t(n, -1) : labels;
+
+    for (int t = 0;; ++t) {
+        auto colvec2 = colvec_t{};
+        colvec2.reserve(n);
+
+        // atp_1(v_1)
+        for (int i = 0; i < n; ++i) {
+            std::vector<std::string> col;
+            col.reserve(n);
+
+            // atp_2(v_1, v_2)
+            for (int j = 0; j < n; ++j) {
+                
+                auto kcolvec_idx = std::array<int, 2>{i, j};
+                // select position 1 or 2
+                for (int p = 0; p < 2; ++p) {
+                    col.emplace_back(str(
+                        i==j, ",", A(i, j), "&",
+                        p, ".", colvec[ kcolvec_idx[p] ], "&"
+                    ));
+                }
+            }
+            std::sort(col.begin(), col.end());
+            colvec2.push_back(relabel(stringyfy_vector(col), rehash));
+        }
+
+
+        if (!is_refined(colvec, colvec2)) {
+            std::sort(colvec2.begin(), colvec2.end());
+            return colvec2;
+        }
+        colvec = std::move(colvec2);
+    }
+
+    return {};
+}
+
+
+
+auto colors_tw_supersimple(SmallGraph const& graph, rehash_t& rehash, int k = 1) -> colvec_t {
+    auto A = graph.to_adjacency_matrix();
+    auto n = A.rows();
+    
+    auto colvec_vart = colvec_t(n, -1);
+    auto colvec_varp = colvec_t(n, -1);
+
+    for (int t = 0;; ++t) {
+        for (int p = 0; p < k+1; ++p) {
+            auto colvec_varp2 = colvec_t{};
+            colvec_varp2.reserve(n);
+
+            // v_i aka v_1
+            for (int i = 0; i < n; ++i) {
+                std::map<std::string, int> col; // multiset, free abelian group etc.
+
+                // v_j aka w
+                for (int j = 0; j < n; ++j) {
+                    int index1, index2;
+                    if (p == 0) index1 = i, index2 = j;
+                    if (p == 1) index1 = j, index2 = i;
+
+                    col[str(
+                        index1==j, A(index1, j), "|",
+                        colvec_varp[index2], "&"
+                    )] += 1;
+                }
+
+                colvec_varp2.push_back(relabel(stringyfy_map(col), rehash));
+            }
+
+            colvec_varp = std::move(colvec_varp2);
+        }
+
+        if (!is_refined(colvec_vart, colvec_varp)) {
+            std::sort(colvec_varp.begin(), colvec_varp.end());
+            return colvec_varp;
+        }
+
+        colvec_vart = colvec_varp;
+    }
+    
+    return {};
+}
+
+
+auto colors_weakertw_supersimple(SmallGraph const& graph, rehash_t& rehash, int k = 1) -> colvec_t {
+    auto A = graph.to_adjacency_matrix();
+    auto n = A.rows();
+    
+    auto colvec_vart = colvec_num_t(n, {1, -1});
+    auto colvec_varp = colvec_num_t(n, {1, -1});
+
+    for (int t = 0;; ++t) {
+        for (int p = 0; p < k+1; ++p) {
+            auto colvec_varp2 = colvec_num_t{};
+            colvec_varp2.reserve(n);
+
+            // v_i aka v_1
+            for (int i = 0; i < n; ++i) {
+                std::map<std::string, int> col; // multiset, free abelian group etc.
+
+                // v_j aka w
+                for (int j = 0; j < n; ++j) {
+                    int index1, index2;
+                    if (p == 0) index1 = i, index2 = j;
+                    if (p == 1) index1 = j, index2 = i;
+
+                    col[str(
+                        index1==j, A(index1, j), "|", 
+                        colvec_varp[index2].second, "&"
+                    )] += colvec_varp[index2].first;
+                }
+
+                // normalize gcd 
+                ull gcd = 0;
+                // for (auto &&[key, value] : col) std::cout << key << " " << value << "\n";
+                for (auto &&[key, value] : col) gcd = std::gcd(gcd, value);
+                for (auto &&[key, value] : col) col[key] = value / gcd;
+
+                
+                colvec_varp2.emplace_back(gcd, relabel(stringyfy_map(col), rehash));
+            }
+
+            colvec_varp = std::move(colvec_varp2);
+        }
+
+        if (!is_refined(colvec_vart, colvec_varp)) {
+            std::sort(colvec_varp.begin(), colvec_varp.end());
+            auto result = colvec_t{};
+            result.reserve(n);
+            for (auto &&[key, value] : colvec_varp) {
+                result.push_back(relabel(str(key, "/", value), rehash));
+            }
+            return result;
+        }
+
+        colvec_vart = colvec_varp;
+    }
+    
+    return {};
+}
+
+
 
 
 
