@@ -150,7 +150,9 @@ private:
 
 
 // graph with less than 256 vertices
-using SmallGraph = Graph<unsigned char>;
+// using SmallGraph = Graph<unsigned char>;
+using SmallGraph = Graph<unsigned int>;
+using LargeGraph = Graph<unsigned long long>;
 
 
 } // namespace wl

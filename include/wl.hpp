@@ -300,7 +300,7 @@ auto colors_weakertw_supersimple(SmallGraph const& graph, rehash_t& rehash, int 
                 }
 
                 // normalize gcd 
-                ull gcd = 0;
+                ull gcd = 1;
                 // for (auto &&[key, value] : col) std::cout << key << " " << value << "\n";
                 for (auto &&[key, value] : col) gcd = std::gcd(gcd, value);
                 for (auto &&[key, value] : col) col[key] = value / gcd;

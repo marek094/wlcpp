@@ -5,6 +5,7 @@
 #include "wl.hpp"
 #include "explain.hpp"
 #include "crtu64t.hpp"
+#include "gadgets.hpp"
 
 #include <ska/unordered_map.hpp>
 #include <omp.h>
@@ -151,23 +152,50 @@ int main(int argc, char* argv[]) {
                 graph_list.insert(graph_list.end(), r.begin(), r.end());
             }
         }
-        return graph_list;
+        
+        // return graph_list;
+        auto gadget_vec = std::vector<wl::SmallGraph>{};
+        for (auto const& graph : graph_list) {
+            auto Xgadget = wl::gadgetize_small(graph, false);
+            if (Xgadget.has_value()) {
+                gadget_vec.emplace_back(Xgadget.value());
+
+                auto Ygadget = wl::gadgetize_small(graph, true);
+                assert (Ygadget.has_value());
+                gadget_vec.emplace_back(Ygadget.value());
+            }
+        }
+
+        return gadget_vec;
     };
 
 
+    if (false) {
+        auto g = wl::SmallGraph{};
+        g.num_vertices = 3;
+        g.add_edge(0, 1);
+        g.add_edge(1, 2);
+        g.add_edge(2, 0);
 
-    auto graph_list = get_graph_list();
+        auto gg = wl::gadgetize_small(g, false).value();
+        std::cout << "gadgetize_small(g, false): " << gg.number_of_vertices() << std::endl;
+        for (auto&& nbs : gg.adj_list) {
+            std::cout  << ": " << wl::stringyfy_vector(nbs) << std::endl;
+            std::cout << std::endl;
+        }
+
+    }
 
     
-    {
-        auto rehash = wl::rehash_t{};
-        // tw1
-        test_run("colors_tw1", get_graph_list, [&rehash](auto const& graph, auto& classes) {
-            auto labels = wl::colors_tw1(graph, rehash);
-            auto label_str = wl::stringyfy_vector(labels);
-            classes[label_str]["-"] += 1;
-        }, false);
-    }
+    // {
+    //     auto rehash = wl::rehash_t{};
+    //     // tw1
+    //     test_run("colors_tw1", get_graph_list, [&rehash](auto const& graph, auto& classes) {
+    //         auto labels = wl::colors_tw1(graph, rehash);
+    //         auto label_str = wl::stringyfy_vector(labels);
+    //         classes[label_str]["-"] += 1;
+    //     }, false);
+    // }
 
     {
         auto rehash = wl::rehash_t{};
@@ -202,15 +230,15 @@ int main(int argc, char* argv[]) {
     
 
 
-    using Int = wl::crt::crtu64t<16>;
-    test_run("wl::compute_quatern_pathwidth_one_homvec<Int>", get_graph_list, [](auto const& graph, auto& classes) {
-        auto homvec = wl::compute_quatern_pathwidth_one_homvec<Int>(graph, graph.number_of_vertices()+4);
-        auto homvec_str = wl::stringyfy_vector(homvec);
-        classes[homvec_str]["-"] += 1;
-    });
+    // using Int = wl::crt::crtu64t<16>;
+    // test_run("wl::compute_quatern_pathwidth_one_homvec<Int>", get_graph_list, [](auto const& graph, auto& classes) {
+    //     auto homvec = wl::compute_quatern_pathwidth_one_homvec<Int>(graph, graph.number_of_vertices()+4);
+    //     auto homvec_str = wl::stringyfy_vector(homvec);
+    //     classes[homvec_str]["-"] += 1;
+    // });
 
     test_run("wl::compute_pathwidth_one_homvec_v2", get_graph_list, [](auto const& graph, auto& classes) {
-        auto homvec = std::get<0>(wl::compute_pathwidth_one_homvec_v2(graph, graph.number_of_vertices()+4));
+        auto homvec = std::get<0>(wl::compute_pathwidth_one_homvec_v2(graph, graph.number_of_vertices()+2));
         auto homvec_str = wl::stringyfy_vector(homvec);
         classes[homvec_str]["-"] += 1;
     });
