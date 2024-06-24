@@ -153,7 +153,8 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        // return graph_list;
+        return graph_list;
+        
         auto gadget_vec = std::vector<wl::SmallGraph>{};
         for (auto const& graph : graph_list) {
             auto Xgadget = wl::gadgetize_small(graph, false);
@@ -227,7 +228,17 @@ int main(int argc, char* argv[]) {
             classes[label_str]["-"] += 1;
         }, false);
     }
-    
+
+
+    {
+        auto rehash = wl::rehash_t{};
+        // colors_weakertw_supersimple
+        test_run("colors_p1_04", get_graph_list, [&rehash](auto const& graph, auto& classes) {
+            auto labels = wl::colors_p1_04(graph, rehash);
+            auto label_str = wl::stringyfy_vector(labels);
+            classes[label_str]["-"] += 1;
+        }, false);
+    }
 
 
     // using Int = wl::crt::crtu64t<16>;
@@ -237,11 +248,11 @@ int main(int argc, char* argv[]) {
     //     classes[homvec_str]["-"] += 1;
     // });
 
-    test_run("wl::compute_pathwidth_one_homvec_v2", get_graph_list, [](auto const& graph, auto& classes) {
-        auto homvec = std::get<0>(wl::compute_pathwidth_one_homvec_v2(graph, graph.number_of_vertices()+2));
-        auto homvec_str = wl::stringyfy_vector(homvec);
-        classes[homvec_str]["-"] += 1;
-    });
+    // test_run("wl::compute_pathwidth_one_homvec_v2", get_graph_list, [](auto const& graph, auto& classes) {
+    //     auto homvec = std::get<0>(wl::compute_pathwidth_one_homvec_v2(graph, graph.number_of_vertices()+2));
+    //     auto homvec_str = wl::stringyfy_vector(homvec);
+    //     classes[homvec_str]["-"] += 1;
+    // });
 
 
     return 0;

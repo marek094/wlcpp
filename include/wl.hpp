@@ -149,7 +149,8 @@ auto colors_1(SmallGraph const& graph, rehash_t& rehash, colvec_t const& labels 
     
     auto colvec = (labels.empty()) ? colvec_t(n, -1) : labels;
 
-    for (int t = 0;; ++t) {
+    int t = 0;
+    for (;; ++t) {
         auto colvec2 = colvec_t{};
         colvec2.reserve(n);
 
@@ -169,11 +170,16 @@ auto colors_1(SmallGraph const& graph, rehash_t& rehash, colvec_t const& labels 
         // std::cout << "" << stringyfy_vector(colvec2) << " \n";
 
         if (!is_refined(colvec, colvec2)) {
-            std::sort(colvec2.begin(), colvec2.end());
+            // std::sort(colvec2.begin(), colvec2.end());
             // std::cout << "t=" << t;
-            return colvec2;
+            std::cerr << "T=" << t << "\n";
+            return {colvec2.end()-1, colvec2.end()};
         }
         colvec = std::move(colvec2);
+
+        if ((t+1) % 1000 == 0) {
+            std::cerr << "M";
+        }
     }
 
     return {};
@@ -379,7 +385,8 @@ auto colors_p1_04(SmallGraph const& graph, rehash_t& rehash, colvec_t const& lab
         colvec2d.emplace_back(colvec_t{label});
     }
 
-    for (int t = 0;; ++t) {
+    int t = 0;
+    for (;; ++t) {
         auto colvec2d2 = std::vector<colvec_t>{};
         colvec2d2.reserve(n);
         
@@ -389,7 +396,8 @@ auto colors_p1_04(SmallGraph const& graph, rehash_t& rehash, colvec_t const& lab
             auto sort_counter = std::unordered_map<std::string, unsigned long long>{};
             for (int j = 0; j < n; ++j) {
                 std::ostringstream atp;
-                atp << (i==j) << A(i, j) << -labels_[i] << -labels_[j] << " &";
+                // atp << (i==j) << A(i, j) << -labels_[i] << -labels_[j] << " &";
+                atp << (i==j) << A(i, j) << " &";
                 assert (colvec2d.size() > j);
                 for (auto &&elem : colvec2d[j]) {
                     auto atp_color = atp.str() + std::to_string(elem);
@@ -410,20 +418,41 @@ auto colors_p1_04(SmallGraph const& graph, rehash_t& rehash, colvec_t const& lab
         }
 
         // std::cout << "\n";
+        // if (!is_refined(colvec2d, colvec2d2)) {
+        std::cout << "R=" << is_refined(colvec2d, colvec2d2) << "\n";
 
-        if (!is_refined(colvec2d, colvec2d2)) {
+            
+            std::cout << "T=" << t << "\n";
+            // std::cout << "(" << stringyfy_vector(colvec2d2.back()) << ") ";
+            // std::sort(colvec2d2.back().begin(), colvec2d2.back().end());
+            // return colvec2d2.back();
+
             auto colvec2 = colvec_t{};
+            std::cout << "{{";
             colvec2.reserve(n);
             for (auto &&vec : colvec2d2) {
                 colvec2.emplace_back(relabel(stringyfy_vector(vec), rehash));
+                std::cout << colvec2.size() << " " << colvec2.back() << ",";
             }
+            std::cout << "}}";
+            // std::cout << "(" << stringyfy_vector(colvec2) << ") ";
             std::sort(colvec2.begin(), colvec2.end());
             // std::cout << "t=" << t;
+
+            std::cout << std::endl << std::flush;
+
+        if (t > 6) {
             return colvec2;
         }
 
         colvec2d = std::move(colvec2d2);
+
+        if ((t+1) % 1000 == 0) {
+            std::cerr << "M";
+        }
     }
+
+
 }
 
 
