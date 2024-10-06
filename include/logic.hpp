@@ -158,12 +158,11 @@ struct LogicQuantifierBase {
 
 template<typename T>
 concept LogicQuantifier = requires(T a, const T b, std::ostream& os) {
-    { a.val() } -> std::same_as<auto&>;
-    { b.val() } -> std::same_as<const auto&>;
+    { a.val() } -> std::same_as<decltype(a.val())&>;
+    { b.val() } -> std::same_as<const decltype(b.val())&>;
     { T::forall_impl() } -> std::same_as<generator<std::remove_reference_t<decltype(a.val())>>>;
     { a.to_string_impl(os) } -> std::same_as<void>;
 };
-
 
 struct LogicQuantifierBound : public LogicQuantifierBase<LogicQuantifierBound> {
     int count = 0;
@@ -541,7 +540,7 @@ public:
         // where \phi(c) = \phi(c, x_1) & \phi(x_1, x_2) & ... & \phi(x_{l-1}, c)
         
 
-
+        
     }
 
     

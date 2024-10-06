@@ -81,12 +81,13 @@ int main(int argc, char* argv[]) {
     auto start = std::chrono::steady_clock::now();
 
 
-    auto results = std::vector<std::vector<unsigned long long>>{};
+    using ull = unsigned long long;
+    auto results = std::vector<std::vector<ull>>{};
     results.resize(graph_list.size());
     {
         #pragma omp parallel for
         for (int i = 0; i < static_cast<int>(graph_list.size()); i++) {
-            results[i] = wl::compute_path_homvec(graph_list[i], graph_list[i].number_of_vertices()+1);
+            results[i] = wl::compute_path_homvec<ull>(graph_list[i], graph_list[i].number_of_vertices()+1);
             // std::cout << i << "\n";
             // for (auto &&h : results[i]) {
             //     auto str = std::to_string(h);
