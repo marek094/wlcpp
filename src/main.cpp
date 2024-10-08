@@ -92,26 +92,12 @@ void test_run(std::string name, InpFunc get_graph_list, ThreadFunc&& thread_func
 }
 
 
-// void trie_test() {
-//     auto trie = trie<uint64_t>{};
-//     trie.root.next[0] = {node{}, 1};
-//     trie.root.next[1] = {node{}, 1};
-//     trie.root.next[0].first.next[0] = {node{}, 1};
-//     trie.root.next[0].first.next[1] = {node{}, 1};
-//     trie.root.next[1].first.next[0] = {node{}, 1};
-//     trie.root.next[1].first.next[1] = {node{}, 1};
-
-//     auto trie2 = trie<uint64_t>{};
-//     trie2.root.next[0] = {node{}, 1};
-//     trie2.root.next[1] = {node{}, 1};
-//     trie2.root.next[0].first.next[0] = {node{}, 1};
-//     trie2.root.next[0].first.next[1] = {node{}, 1};
-//     trie2.root.next[1].first.next[0] = {node{}, 1};
-//     trie2.root.next[1].first.next[1] = {node{}, 1};
-    
-//     trie.merge(trie2);
-// }
-
+template<std::three_way_comparable T>
+auto unique_size(std::vector< T> vec) -> size_t {
+    std::sort(vec.begin(), vec.end());
+    auto proposed_end = std::unique(vec.begin(), vec.end());
+    return std::distance(vec.begin(), proposed_end);
+}
 
 
 int main(int argc, char* argv[]) {
@@ -173,52 +159,69 @@ int main(int argc, char* argv[]) {
 
 
     {
+        auto start = std::chrono::steady_clock::now();
+
         auto rehash = wl::rehash_t{};
         auto graph_list = get_graph_list();
-        std::cout << "Read " << graph_list.size() << " graphs.\n";
+        std::cout << "read " << graph_list.size() << " graphs\n";
 
+        
+        auto colvecs = std::vector<wl::colvec_t>{};        
         for (auto &&graph : graph_list) {
             auto colvec = wl::colors_1(graph, rehash);
+            colvecs.emplace_back(std::move(colvec));
         }
 
-        std::cout << "colors_1 color classes " << rehash.size() << "\n";
+        std::cout << "color classes " << unique_size(std::move(colvecs)) << " (colors_1) \n";
+
+        std::cout << "\ttime elapsed ";
+        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start).count() << "ms\n\n";
     }
 
 
     {
-        // auto path_rehash = wl::rehash_t{};
-        auto graph_list = get_graph_list();
-        std::cout << "Read " << graph_list.size() << " graphs.\n";
+        auto start = std::chrono::steady_clock::now();
 
-        auto colvecs = std::vector<wl::trie<uint64_t>>{};
-        for (auto &&graph : graph_list) {
-            auto colvec = wl::colors_path(graph);
+
+        auto graph_list = get_graph_list();
+        std::cout << "read " << graph_list.size() << " graphs\n";
+
+        auto colvecs = std::vector<std::vector<wl::trie<uint64_t>>>{};
+        for (auto&& graph : graph_list) {
+            auto colvec = wl::colors_caterpillar(graph);
             colvecs.emplace_back(std::move(colvec));
+            // std::cout << "." << std::flush;
         }
 
-        std::sort(colvecs.begin(), colvecs.end());
-        colvecs.erase(std::unique(colvecs.begin(), colvecs.end()), colvecs.end());
+        std::cout << "color classes " << unique_size(std::move(colvecs)) << " (colors_caterpillar) \n";
 
-        std::cout << "colors_path color classes " << colvecs.size() << "\n";
+        std::cout << "\ttime elapsed ";
+        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start).count() << "ms\n\n";
     }
 
 
+    {
+        auto start = std::chrono::steady_clock::now();
 
-    std::vector<std::pair<std::string, std::function<void(wl::SmallGraph&, map_hashmap_t&)>>> runs;
 
+        auto graph_list = get_graph_list();
+        std::cout << "read " << graph_list.size() << " graphs\n";
 
-    // list of all runs
-    for (auto&& [name, func] : runs) {
-        std::cout << name << std::endl;
+        auto colvecs = std::vector<std::vector<wl::poly_t>>{};
+        for (auto&& graph : graph_list) {
+            auto colvec = wl::colors_path(graph);
+            colvecs.emplace_back(std::move(colvec));
+            // std::cout << "." << std::flush;
+        }
+
+        std::cout << "color classes " << unique_size(std::move(colvecs)) << " (colors_path) \n";
+
+        std::cout << "\ttime elapsed ";
+        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start).count() << "ms\n\n";
     }
-
-    for (auto&& [name, func] : runs) {
-        test_run(name, get_graph_list, func);
-    }
-    
-
-
-
 
 
     return 0;

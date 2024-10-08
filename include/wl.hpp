@@ -6,6 +6,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <compare>
 
 namespace wl {
 
@@ -82,7 +83,6 @@ auto is_refined(std::vector<colvec_t> const& vec2d1, std::vector<colvec_t> const
 
     return is_refined(vec1, vec2);
 }
-
 
 
 
@@ -266,6 +266,22 @@ class trie {
             return next.empty();
         }
 
+        auto size() -> size_t {
+            int sum = 0;
+            for (auto &&[key, val] : next) {
+                sum += val.second;
+            }
+            return sum;
+        }
+
+        auto max_depth() -> size_t {
+            size_t result = 1;
+            for (auto&& [key, val] : next) {
+                result = std::max(result, val.first.max_depth());
+            }
+            return result;
+        }
+
         auto operator<=>(node const& other) const {
             auto it = next.begin();
             auto it_other = other.next.begin();
@@ -326,16 +342,24 @@ public:
         merge_helper(&root, other.root);
     }
 
-    // friend auto inc(node* current) -> void {
-    //     auto root = node{};
-    //     root.next[0] = {*current, 1};
-    //     return root;
-    // }
-
+    // wl::trie::inc is an implemetation of the following rule:
+    // \langle \sum_i^{d+1} \langle t_i \rangle + a \rangle =
+    // \sum_i^{d+1} \langle \langle t_i \rangle + d + a \rangle
+    // where the LHS and RHS sums are contents of the trie.
     auto inc() -> void {
-        auto was_root = std::move(root);
-        root = node{};
-        root.next[0] = {std::move(was_root), 1};
+        auto const size = this->size();
+        if (size == 0) {
+            this->insert({0});
+            return;
+        }
+
+        auto d = size - this->count_legs() - 1;
+        if (size == 1) {
+            d = 0;
+        }
+
+        auto next_entry = std::pair<node, size_t>{std::move(root), size};
+        root.next[d] = std::move(next_entry);
     }
 
     auto operator<=>(trie const& other) const {
@@ -347,11 +371,20 @@ public:
     }
 
     auto size() -> size_t {
+        return root.size();
+    }
+
+    auto count_legs() -> size_t {
         int sum = 0;
-        for (auto &&[key, value] : root.next) {
-            sum += value.second;
+        for (auto&& [key, val] : root.next) {
+            auto&& [node, count] = val;
+            sum += static_cast<size_t>(count - node.size());
         }
         return sum;
+    }
+
+    auto max_depth() -> size_t {
+        return root.max_depth();
     }
 
     node root;
@@ -359,85 +392,179 @@ public:
 
 
 
+namespace impl {
 
-auto colors_path(SmallGraph const& graph) -> trie<uint64_t> {
+    template<typename T>
+    auto partition(T const& sorted_vec) -> std::vector<size_t> {
+        auto result = std::vector<size_t>{};
+
+        int last_repr = 0;
+        for (size_t i=1; i < sorted_vec.size(); ++i) {
+            if (sorted_vec[i] != sorted_vec[last_repr]) {
+                result.emplace_back(i - last_repr);
+                last_repr = i;
+            }
+        }
+
+        result.emplace_back(sorted_vec.size() - last_repr);
+        return result;
+    }
+
+}
+
+
+template<std::three_way_comparable T>
+auto is_refined_sorted(std::vector< T> const& vec1, std::vector< T> const& vec2) -> bool {
+    auto sizes1 = impl::partition(vec1);
+    auto sizes2 = impl::partition(vec2);
+
+    if (sizes1.size() != sizes2.size()) {
+        return true;
+    }
+
+    std::sort(sizes1.begin(), sizes1.end());
+    std::sort(sizes2.begin(), sizes2.end());
+
+    if (sizes1 != sizes2) {
+        return true;
+    }
+
+    return false;
+}
+
+
+template<std::three_way_comparable T>
+auto is_refined(std::vector< T> vec1, std::vector< T> vec2) -> bool {
+    std::sort(vec1.begin(), vec1.end());
+    std::sort(vec2.begin(), vec2.end());
+
+    return is_refined_sorted(vec1, vec2);
+}
+
+
+auto colors_caterpillar(SmallGraph const& graph) -> std::vector<trie<uint64_t>> {
 
     auto n = graph.number_of_vertices();
 
-    auto coltries = std::vector<trie<uint64_t>>{};
-    coltries.resize(n);
+    auto coltries = std::vector<trie<uint64_t>>(n);
+    auto coltries_sorted = coltries;
     
     for (int t = 0;; ++t) {
         auto coltries2 = std::vector<trie<uint64_t>>{};
-        coltries2.resize(n);
+        coltries2.reserve(n);
 
         for (int i = 0; i < n; ++i) {
-            if (i >= graph.adj_list.size()) {
-                continue;
+            // original 
+            auto sum = coltries[i];
+
+            if (i < graph.adj_list.size()) {
+                for (int j : graph.adj_list[i]) {
+                    auto trie_inc = coltries[j];
+                    trie_inc.inc();
+                    sum.merge(trie_inc);
+                }
             }
 
-            auto&& list = graph.adj_list[i];
-            auto sum = trie<uint64_t>{};
-            for (int j : list) {
-                auto trie_inc = coltries[j];
-                trie_inc.inc();
-                sum.merge(trie_inc);
-            }
+            coltries2.emplace_back(std::move(sum));
         }
 
-        if (coltries == coltries2) {
-            auto sum = trie<uint64_t>{};
-            for (auto &&trie : coltries) {
-                sum.merge(trie);
-            }
-            return sum;
+        // copy
+        coltries = coltries2;
+        
+        // coltries2_sorted
+        std::sort(coltries2.begin(), coltries2.end());
+
+        if (!is_refined_sorted(coltries_sorted, coltries2)) {
+            return coltries2;
         }
 
-        coltries = std::move(coltries2);
+        coltries_sorted = std::move(coltries2);
     }
 
+    return {};
 };
 
 
+// using poly_t = std::map<uint64_t, uint64_t>;
+class poly_t {
+
+public:
+    poly_t() : data{} {}
+
+    auto merge(poly_t const& other) -> void {
+        for (auto&& [key, val] : other.data) {
+            data[key] += val;
+        }
+    }
+
+    auto inc() -> void {
+        if (data.empty()) {
+            data[0] = 1;
+            return;
+        }
+
+        auto upd_data = std::map<uint64_t, uint64_t>{};
+        for (auto&& [key, val] : data) {
+            upd_data[key + 1] = val;
+        }
+
+        data = std::move(upd_data);
+    }
+
+    auto operator<=>(poly_t const& other) const {
+        return data <=> other.data;
+    }
+
+    auto operator==(poly_t const& other) const -> bool {
+        return data == other.data;
+    }
+
+    std::map<uint64_t, uint64_t> data;
+};
 
 
-// auto colors_1(SmallGraph const& graph, rehash_t& rehash, colvec_t const& labels = {}) -> colvec_t {
-//     auto A = graph.to_adjacency_matrix();
-//     auto n = A.rows();
+auto colors_path(SmallGraph const& graph) -> std::vector<poly_t> {
+
+    auto n = graph.number_of_vertices();
+
+    auto colpolys = std::vector<poly_t>(n);
+    for (auto& t : colpolys) t.inc();
+    auto coltries_sorted = colpolys;
     
-//     auto colvec = (labels.empty()) ? colvec_t(n, -1) : labels;
+    for (int t = 0;; ++t) {
+        auto colpolys2 = std::vector<poly_t>{};
+        colpolys2.reserve(n);
 
-//     for (int t = 0;; ++t) {
-//         auto colvec2 = colvec_t{};
-//         colvec2.reserve(n);
+        for (int i = 0; i < n; ++i) {
+            // original 
+            auto sum = colpolys[i];
 
-//         // std::cout << "t=" << t << ": ";
-//         for (int i = 0; i < n; ++i) {
-//             std::vector<std::string> col;
-//             col.reserve(n);
-//             for (int j = 0; j < n; ++j) {
-//                 std::ostringstream ss;
-//                 ss << (i==j) << A(i, j) << "&";
-//                 ss << colvec[j] << "&" << colvec[i];
-//                 col.emplace_back(std::move(ss).str());
-//             }
-//             std::sort(col.begin(), col.end());
-//             colvec2.push_back(relabel(stringyfy_vector(col), rehash));
-//         }
-//         // std::cout << "" << stringyfy_vector(colvec2) << " \n";
+            if (i < graph.adj_list.size()) {
+                for (int j : graph.adj_list[i]) {
+                    auto trie_inc = colpolys[j];
+                    trie_inc.inc();
+                    sum.merge(trie_inc);
+                }
+            }
 
-//         if (!is_refined(colvec, colvec2)) {
-//             std::sort(colvec2.begin(), colvec2.end());
-//             // std::cout << "t=" << t;
-//             return colvec2;
-//         }
-//         colvec = std::move(colvec2);
-//     }
+            colpolys2.emplace_back(std::move(sum));
+        }
 
-//     return {};
-// }
+        // copy
+        colpolys = colpolys2;
+        
+        // coltries2_sorted
+        std::sort(colpolys2.begin(), colpolys2.end());
 
+        if (!is_refined_sorted(coltries_sorted, colpolys2)) {
+            return colpolys2;
+        }
 
+        coltries_sorted = std::move(colpolys2);
+    }
+
+    return {};
+};
 
 
 
