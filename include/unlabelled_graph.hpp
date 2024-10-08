@@ -42,20 +42,8 @@ public:
     }
 
     auto number_of_vertices() const -> size_t {
-        assert (num_vertices == adj_list.size());
+        assert (num_vertices >= adj_list.size());
         return static_cast<size_t>(num_vertices);
-        // return adj_list.size();
-        // if (edges.empty()) {
-        //     return 0;
-        // }
-
-        // // if (num_vertices == -1) {
-        // auto projection = [](auto &&edge) { return std::max<vertex_t>(edge.first, edge.second); };
-        // auto largest_label = std::ranges::max(edges, {}, projection);
-        // auto num_vertices = projection(largest_label) + 1;
-        // // }
-
-        // return num_vertices;
     }
 
     auto add_edge(vertex_t u, vertex_t v) -> void {

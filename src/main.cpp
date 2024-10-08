@@ -83,16 +83,34 @@ void test_run(std::string name, InpFunc get_graph_list, ThreadFunc&& thread_func
 
     auto end = std::chrono::high_resolution_clock::now();
     std::cout << "\n\t " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms";
-    for (auto &&[key, value] : classes) {
-        std::cout << "\n\t" << name << " classes " << key << ": " << value.size() << "";
-    }
+    // for (auto &&[key, value] : classes) {
+    //     std::cout << "\n\t" << name << " classes " << key << ": " << value.size() << "";
+    // }
+    std::cout << "\n\t" << "Classes: " << classes.size() << "\n";
     std::cout << "\n\n\n";
 
 }
 
 
+// void trie_test() {
+//     auto trie = trie<uint64_t>{};
+//     trie.root.next[0] = {node{}, 1};
+//     trie.root.next[1] = {node{}, 1};
+//     trie.root.next[0].first.next[0] = {node{}, 1};
+//     trie.root.next[0].first.next[1] = {node{}, 1};
+//     trie.root.next[1].first.next[0] = {node{}, 1};
+//     trie.root.next[1].first.next[1] = {node{}, 1};
 
-
+//     auto trie2 = trie<uint64_t>{};
+//     trie2.root.next[0] = {node{}, 1};
+//     trie2.root.next[1] = {node{}, 1};
+//     trie2.root.next[0].first.next[0] = {node{}, 1};
+//     trie2.root.next[0].first.next[1] = {node{}, 1};
+//     trie2.root.next[1].first.next[0] = {node{}, 1};
+//     trie2.root.next[1].first.next[1] = {node{}, 1};
+    
+//     trie.merge(trie2);
+// }
 
 
 
@@ -154,212 +172,39 @@ int main(int argc, char* argv[]) {
     };
 
 
+    {
+        auto rehash = wl::rehash_t{};
+        auto graph_list = get_graph_list();
+        std::cout << "Read " << graph_list.size() << " graphs.\n";
 
-    int plus = 9;
-    
+        for (auto &&graph : graph_list) {
+            auto colvec = wl::colors_1(graph, rehash);
+        }
+
+        std::cout << "colors_1 color classes " << rehash.size() << "\n";
+    }
+
+
+    {
+        // auto path_rehash = wl::rehash_t{};
+        auto graph_list = get_graph_list();
+        std::cout << "Read " << graph_list.size() << " graphs.\n";
+
+        auto colvecs = std::vector<wl::trie<uint64_t>>{};
+        for (auto &&graph : graph_list) {
+            auto colvec = wl::colors_path(graph);
+            colvecs.emplace_back(std::move(colvec));
+        }
+
+        std::sort(colvecs.begin(), colvecs.end());
+        colvecs.erase(std::unique(colvecs.begin(), colvecs.end()), colvecs.end());
+
+        std::cout << "colors_path color classes " << colvecs.size() << "\n";
+    }
+
+
 
     std::vector<std::pair<std::string, std::function<void(wl::SmallGraph&, map_hashmap_t&)>>> runs;
-
-
-    
-    {
-        auto func = [=]<typename Int>(auto&& graph, auto& classes) {
-            auto homvec_out = wl::compute_path_homvec<Int>(graph, graph.number_of_vertices()+plus);
-                
-            classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
-            uint64_t n = homvec_out.size() -plus-1;
-            for (int j = 0; j <= plus; ++j) {
-                classes["N+"+to_string(j)][to_string(homvec_out[n+j])] += 1;
-            }
-
-            // int sum = 0;
-            // for (int j = 0; j < homvec_out.size()-plus; ++j) {
-            //     sum += homvec_out[j];
-            // }
-            // for (int j = 0; j <= plus; ++j) {
-            //     sum += homvec_out[n+j];
-            //     classes["xN+"+std::to_string(j)][std::to_string(sum)] += 1;
-            // }
-
-            Int sum_odd = 0;
-            Int sum_even = 0;
-            for (int j = 0; j < homvec_out.size()-plus; ++j) {
-                if (j % 2 == 0) {
-                    sum_even += homvec_out[j];
-                } else {
-                    sum_odd += homvec_out[j];
-                }
-            }
-            for (int j = 0; j <= plus; ++j) {
-                if ((n+j) % 2 == 0) {
-                    sum_even += homvec_out[n+j];
-                } else {
-                    sum_odd += homvec_out[n+j];
-                }
-                classes["yN+"+to_string(j)][to_string(sum_even) + "|" + to_string(sum_odd)] += 1;
-            }
-            
-        };
-
-
-
-        runs.emplace_back("compute_path_homvec<4>", [=](auto&& g, auto& c) {return func.operator()<wl::crt::crtu64t<4>>(g, c);});
-        runs.emplace_back("compute_path_homvec<1>", [=](auto&& g, auto& c) {return func.operator()<uint64_t>(g, c);});
-    }
-
-
-    runs.emplace_back("compute_complex_path_homvec", [=](auto&& graph, auto& classes) {
-        auto homvec_out = wl::compute_complex_path_homvec(graph, graph.number_of_vertices()+plus);
-                
-        classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
-        uint64_t n = homvec_out.size() -plus-1;
-        for (int j = 0; j <= plus; ++j) {
-            classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j].real()) + "|" + std::to_string(homvec_out[n+j].imag())] += 1;
-        }
-
-        
-    });
-
-
-    // runs.emplace_back("compute_complex_path_homvec(-)", [=](auto&& graph, auto& classes) {
-    //     auto homvec_out =  wl::compute_complex_path_homvec(graph, graph.number_of_vertices()+plus, -1);
-                
-    //     classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
-    //     uint64_t n = homvec_out.size() -plus-1;
-    //     for (int j = 0; j <= plus; ++j) {
-    //         classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j].real()) + "|" + std::to_string(homvec_out[n+j].imag())] += 1;
-    //     }
-    // });
-
-
-    runs.emplace_back("compute_complex_path_homvec_boost(B)", [=](auto&& graph, auto& classes) {
-        auto homvec_out =  wl::compute_complex_path_homvec_boost(graph, graph.number_of_vertices()+plus);
-                
-        classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
-        uint64_t n = homvec_out.size() -plus-1;
-        for (int j = 0; j <= plus; ++j) {
-            classes["N+"+std::to_string(j)][std::to_string(homvec_out[n+j].real()) + "|" + std::to_string(homvec_out[n+j].imag())] += 1;
-        }
-    });
-    runs.pop_back();
-
-
-    runs.emplace_back("compute_path_homvec_labeled", [=](auto&& graph, auto& classes) {
-        auto homvec_out = wl::compute_path_homvec_labeled(graph, graph.number_of_vertices()+plus);
-        classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
-    });
-
-
-    {
-        auto func = [=]<typename Int>(auto&& graph, auto& classes) {
-            auto homvec_out = wl::compute_complex_pathwidth_one_homvec<Int>(graph, graph.number_of_vertices()+plus);
-
-            for (int i = 0; i < homvec_out.size(); i++) {
-                classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
-                uint64_t n = homvec_out.size() -plus-1;
-                for (int j = 0; j <= plus; ++j) {
-                    classes["N+"+to_string(j)][to_string(homvec_out[n+j].real()) + "|" + to_string(homvec_out[n+j].imag())] += 1;
-                }
-            }
-        };
-        
-        runs.emplace_back("compute_complex_pathwidth_one_homvec<16>", [=](auto&& g, auto& c) {return func.operator()<wl::crt::crtu64t<16>>(g, c);});
-        runs.emplace_back("compute_complex_pathwidth_one_homvec<1>", [=](auto&& g, auto& c) {return func.operator()<int64_t>(g, c);});
-    }
-    runs.pop_back();
-    runs.pop_back();
-
-
-    runs.emplace_back("compute_complex_pathwidth_one_homvec(D+Ax)<16>", [=](auto&& graph, auto& classes) {
-        using Int = wl::crt::crtu64t<16>;
-        auto homvec_out = wl::compute_complex_pathwidth_one_homvec<Int>(graph, graph.number_of_vertices()+plus, /*switch*/ true);
-
-        for (int i = 0; i < homvec_out.size(); i++) {
-            classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
-            uint64_t n = homvec_out.size() -plus-1;
-            for (int j = 0; j <= plus; ++j) {
-                classes["N+"+to_string(j)][to_string(homvec_out[n+j].real()) + "|" + to_string(homvec_out[n+j].imag())] += 1;
-            }
-        }
-        
-    });
-    runs.pop_back();
-
-
-    runs.emplace_back("compute_complex_pathwidth_one_homvec(B)<16>", [=](auto&& graph, auto& classes) {
-        using Int = wl::crt::crtu64t<16>;
-        auto homvec_out = wl::compute_complex_pathwidth_one_homvec<Int>(graph, graph.number_of_vertices()+plus, /*switch*/ false, true);
-
-        for (int i = 0; i < homvec_out.size(); i++) {
-            classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
-            uint64_t n = homvec_out.size() -plus-1;
-            for (int j = 0; j <= plus; ++j) {
-                classes["N+"+to_string(j)][to_string(homvec_out[n+j].real()) + "|" + to_string(homvec_out[n+j].imag())] += 1;
-            }
-        }
-        
-    });
-    runs.pop_back();
-
-
-    runs.emplace_back("compute_quatern_pathwidth_one_homvec(B)<16>", [=](auto&& graph, auto& classes) {
-        using Int = wl::crt::crtu64t<16>;
-        // using Int = int64_t;
-        auto homvec_out = wl::compute_quatern_pathwidth_one_homvec<Int>(graph, graph.number_of_vertices()+plus);
-
-        for (int i = 0; i < homvec_out.size(); i++) {
-            classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
-            uint64_t n = homvec_out.size() -plus-1;
-            for (int j = 0; j <= plus; ++j) {
-                classes["N+"+to_string(j)][
-                    (std::stringstream{} << homvec_out[n+j]).str()
-                ] += 1;
-            }
-        }
-        
-    });
-
-
-
-
-
-    // return 0;
-
-
-    // runs.emplace_back("compute_pathwidth_one_homvec_bases", [=](auto&& graph, auto& classes) {
-    //     long long square = graph.number_of_vertices() * graph.number_of_vertices() / 2;
-    //     auto homvec_out = wl::compute_pathwidth_one_homvec_bases(graph, square, square);
-            
-    //     classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
-    //     uint64_t n = homvec_out.size() -plus-1;
-    // });
-
-
-
-    runs.emplace_back("compute_pathwidth_one_homvec_v2", [=](auto&& graph, auto& classes) {
-        auto [homvec_out, homexpr] = wl::compute_pathwidth_one_homvec_v2(graph, graph.number_of_vertices()+5);
-            
-        classes["   "][wl::stringyfy_vector(homvec_out)] += 1;
-
-
-        // std::map<std::string, std::string> sorted_exprs;
-        // for (int i = 0; i < homvec_out.size(); ++i) {
-        //     auto const& vec = homvec_out[i];
-        //     auto const& expr = homexpr[i];
-
-        //     std::string sorted_expr = expr;
-        //     std::sort(sorted_expr.begin(), sorted_expr.end());
-        //     sorted_exprs[sorted_expr] += std::to_string(vec) + " ";
-        // }
-
-        // for (auto &&[key, value] : sorted_exprs) {
-        //     classes[key][value] += 1;
-        // }
-
-        
-    });
-    
-    
 
 
     // list of all runs

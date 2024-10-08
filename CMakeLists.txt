@@ -20,6 +20,16 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 
 # Add subdirectories
 add_subdirectory(src)
-#add_subdirectory(test)
+
+
+# Add Google Test
+add_subdirectory(libs/googletest)
+
+# Enable testing
+enable_testing()
+
+# Add test directory
+add_subdirectory(test)
+
 
 # add_executable(wlcpp main.cpp)

@@ -1,41 +1,7 @@
-// def __relabel(col, rehash):
-//     colstr = str(col)
-//     if colstr not in rehash:
-//         rehash[colstr] = len(rehash)
-//     return rehash[colstr]
-
-
-// def __is_refined(vec1, vec2):
-//     # return (vec1-vec1.min() != vec2-vec2.min()).any()
-//     # return (vec1 != vec2).any()
-
-//     rho1 = np.array(sorted([(vec1 == v).sum() for v in np.unique(vec1)]))
-//     rho2 = np.array(sorted([(vec2 == v).sum() for v in np.unique(vec2)]))
-//     return (rho1.shape[0] != rho2.shape[0]) or (rho1 != rho2).any()
-
-
-
-// def colors_1(graph, rehash={}, labels=None):
-//     """
-//     latex_name: $1$-WL
-//     """
-//     A = __check_and_get_A(graph)
-//     n = A.shape[0]
-//     colvec = __check_and_get_labels(A, labels)
-//     while True:
-//         colvec2 = np.array([
-//             __relabel((colvec[i], sorted(colvec[A[i] != 0])), rehash)
-//             for i in range(n)
-//         ])
-//         if not __is_refined(colvec, colvec2):
-//             colvec2.sort()
-//             return colvec2, rehash
-//         colvec = colvec2
-//     return None
-
-
-
 #pragma once
+
+
+#include "unlabelled_graph.hpp"
 
 #include <sstream>
 #include <string>
@@ -289,6 +255,190 @@ auto colors_p1_05(SmallGraph const& graph, rehash_t& rehash, colvec_t const& lab
         colvec2d = std::move(colvec2d2);
     }
 }
+
+
+template <typename Int=uint64_t>   
+class trie {
+    struct node {
+        std::map<Int, std::pair<node, size_t>> next;
+
+        auto is_leaf() -> bool {
+            return next.empty();
+        }
+
+        auto operator<=>(node const& other) const {
+            auto it = next.begin();
+            auto it_other = other.next.begin();
+
+            while (it != next.end() && it_other != other.next.end()) {
+                if (it->first != it_other->first) {
+                    return it->first <=> it_other->first;
+                }
+                if (it->second != it_other->second) {
+                    return it->second <=> it_other->second;
+                }
+                ++it;
+                ++it_other;
+            }
+            
+            if (it == next.end() && it_other == other.next.end()) {
+                return std::strong_ordering::equal;
+            } else if (it == next.end()) {
+                return std::strong_ordering::less;
+            } else {
+                return std::strong_ordering::greater;
+            }
+        }
+
+        auto operator==(node const& other) const {
+            return next == other.next;
+        }
+    };
+
+public:
+    trie() : root{} {}
+
+    auto insert(std::vector<Int> const& vec) -> void {
+        auto current = &root;
+        for (Int elem : vec) {
+            if (auto it = current->next.find(elem); it != current->next.end()) {
+                auto& [node, count] = it->second;
+                count += 1;
+            } else {
+                current->next[elem] = {node{}, 1};
+            }
+            current = &current->next[elem].first;
+        }
+    }
+
+    friend auto merge_helper(node* current, node const& other) -> void {
+        for (auto &&[key, value] : other.next) {
+            if (auto it = current->next.find(key); it != current->next.end()) {
+                it->second.second += value.second;
+                merge_helper(&it->second.first, value.first);
+            } else {
+                current->next[key] = value;
+            }
+        }
+    }
+
+    auto merge(trie const& other) -> void {
+        merge_helper(&root, other.root);
+    }
+
+    // friend auto inc(node* current) -> void {
+    //     auto root = node{};
+    //     root.next[0] = {*current, 1};
+    //     return root;
+    // }
+
+    auto inc() -> void {
+        auto was_root = std::move(root);
+        root = node{};
+        root.next[0] = {std::move(was_root), 1};
+    }
+
+    auto operator<=>(trie const& other) const {
+        return root <=> other.root;
+    }
+
+    auto operator==(trie const& other) const -> bool {
+        return root == other.root;
+    }
+
+    auto size() -> size_t {
+        int sum = 0;
+        for (auto &&[key, value] : root.next) {
+            sum += value.second;
+        }
+        return sum;
+    }
+
+    node root;
+};
+
+
+
+
+auto colors_path(SmallGraph const& graph) -> trie<uint64_t> {
+
+    auto n = graph.number_of_vertices();
+
+    auto coltries = std::vector<trie<uint64_t>>{};
+    coltries.resize(n);
+    
+    for (int t = 0;; ++t) {
+        auto coltries2 = std::vector<trie<uint64_t>>{};
+        coltries2.resize(n);
+
+        for (int i = 0; i < n; ++i) {
+            if (i >= graph.adj_list.size()) {
+                continue;
+            }
+
+            auto&& list = graph.adj_list[i];
+            auto sum = trie<uint64_t>{};
+            for (int j : list) {
+                auto trie_inc = coltries[j];
+                trie_inc.inc();
+                sum.merge(trie_inc);
+            }
+        }
+
+        if (coltries == coltries2) {
+            auto sum = trie<uint64_t>{};
+            for (auto &&trie : coltries) {
+                sum.merge(trie);
+            }
+            return sum;
+        }
+
+        coltries = std::move(coltries2);
+    }
+
+};
+
+
+
+
+// auto colors_1(SmallGraph const& graph, rehash_t& rehash, colvec_t const& labels = {}) -> colvec_t {
+//     auto A = graph.to_adjacency_matrix();
+//     auto n = A.rows();
+    
+//     auto colvec = (labels.empty()) ? colvec_t(n, -1) : labels;
+
+//     for (int t = 0;; ++t) {
+//         auto colvec2 = colvec_t{};
+//         colvec2.reserve(n);
+
+//         // std::cout << "t=" << t << ": ";
+//         for (int i = 0; i < n; ++i) {
+//             std::vector<std::string> col;
+//             col.reserve(n);
+//             for (int j = 0; j < n; ++j) {
+//                 std::ostringstream ss;
+//                 ss << (i==j) << A(i, j) << "&";
+//                 ss << colvec[j] << "&" << colvec[i];
+//                 col.emplace_back(std::move(ss).str());
+//             }
+//             std::sort(col.begin(), col.end());
+//             colvec2.push_back(relabel(stringyfy_vector(col), rehash));
+//         }
+//         // std::cout << "" << stringyfy_vector(colvec2) << " \n";
+
+//         if (!is_refined(colvec, colvec2)) {
+//             std::sort(colvec2.begin(), colvec2.end());
+//             // std::cout << "t=" << t;
+//             return colvec2;
+//         }
+//         colvec = std::move(colvec2);
+//     }
+
+//     return {};
+// }
+
+
+
 
 
 } // namespace wl
