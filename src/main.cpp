@@ -18,7 +18,7 @@
 #include <complex>
 #include <map>
 #include <functional>
-
+#include <concepts>
 
 
 using map_hashmap_t = std::map<std::string, ska::unordered_map<std::string, int>>;
@@ -31,66 +31,6 @@ struct config_t {
 };
 
 
-template<typename InpFunc, typename ThreadFunc>
-void test_run(std::string name, InpFunc get_graph_list, ThreadFunc&& thread_func) {
-    // timer 
-    auto start = std::chrono::high_resolution_clock::now();
-
-    auto par_classes = vecmap_hashmap_t{};
-
-    // get omp parallel threads count 
-    int num_threads = omp_get_max_threads();
-    par_classes.resize(num_threads);
-
-    {
-        auto graph_list = get_graph_list();
-        std::cout << "Read " << graph_list.size() << " graphs.\n";
-        int percent = std::max(graph_list.size() / 100, 1UL);
-
-        #pragma omp parallel for
-        for (int i = 0; i < graph_list.size(); i++) {
-            // std::cout << "X" << std::endl;
-            thread_func(
-                graph_list[i],
-                par_classes[omp_get_thread_num()]
-            );
-
-            if (i % percent == percent-1) {
-                std::cout << "|" << std::flush;
-            }
-        }
-        
-        std::cout << "\nDone with computation" << std::endl;
-    }
-    
-    // aggregate classes 
-    auto& classes = par_classes.front();
-    {
-        for (int i = 1; i < par_classes.size(); ++i) {
-            for (auto &&[key, value] : par_classes[i]) {
-                for (auto &&[key2, value2] : value) {
-                    classes[key][key2] += value2;
-                }
-            }
-            std::cout << "/" << std::flush;
-
-            // make the space available in par_classes[i]
-            par_classes[i] = map_hashmap_t{};
-        }
-
-        std::cout << "\nDone with aggregation" << std::endl;
-    }
-
-    auto end = std::chrono::high_resolution_clock::now();
-    std::cout << "\n\t " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms";
-    // for (auto &&[key, value] : classes) {
-    //     std::cout << "\n\t" << name << " classes " << key << ": " << value.size() << "";
-    // }
-    std::cout << "\n\t" << "Classes: " << classes.size() << "\n";
-    std::cout << "\n\n\n";
-
-}
-
 
 template<std::three_way_comparable T>
 auto unique_size(std::vector< T> vec) -> size_t {
@@ -98,6 +38,102 @@ auto unique_size(std::vector< T> vec) -> size_t {
     auto proposed_end = std::unique(vec.begin(), vec.end());
     return std::distance(vec.begin(), proposed_end);
 }
+
+
+
+template<std::three_way_comparable T>
+struct data_with_index {
+    T data;
+    size_t index;
+
+    auto operator<=>(data_with_index const& other) const {
+        return data <=> other.data;
+    }
+
+    auto operator==(data_with_index const& other) const -> bool {
+        return data == other.data;
+    }
+};
+
+
+auto partitions_to_map(std::vector<std::vector<size_t>> const& partitions) {
+    auto result = std::unordered_map<size_t, size_t>{};
+    for (size_t i = 0; i < partitions.size(); ++i) {
+        for (auto&& elem : partitions[i]) {
+            result[elem] = i;
+        }
+    }
+    return result;
+}
+
+
+template<typename GetGraphs, typename GetColors>
+auto compute_equivalence(std::string name, GetGraphs&& get_graphs, GetColors&& get_colors) {
+    
+    auto start = std::chrono::steady_clock::now();
+
+    auto graph_list = get_graphs();
+    std::cout << "read " << graph_list.size() << " graphs\n";
+
+    
+    using return_t = decltype(get_colors(graph_list[0]));
+    auto colvecs = std::vector<data_with_index<return_t>>{};
+    for (size_t i = 0; i < graph_list.size(); ++i) {
+        auto colvec = get_colors(graph_list[i]);
+        colvecs.emplace_back(std::move(colvec), i);
+    }
+
+    std::cout << "color classes " << unique_size(colvecs) << " (" << name << ") \n";
+
+    std::cout << "\ttime elapsed ";
+    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - start).count() << "ms\n\n";
+
+    
+    std::sort(colvecs.begin(), colvecs.end());
+
+    auto result = std::vector<std::vector<size_t>>{};
+    for (size_t i = 0; i < colvecs.size(); ++i) {
+        if (i == 0 || colvecs[i].data != colvecs[i-1].data) {
+            result.emplace_back();
+        }
+        result.back().push_back(colvecs[i].index);
+    }
+
+
+    return result;
+}
+
+
+auto print_subclasses(
+    std::string name,
+    std::vector<std::vector<size_t>> const& eq_parts, 
+    std::unordered_map<size_t, size_t> const& part2graph,
+    std::vector<wl::SmallGraph> const& graph_list
+) {
+    for (auto const& part : eq_parts) {
+        auto subclasses = std::unordered_map<size_t, std::vector<size_t>>{};
+        for (auto idx : part) {
+            subclasses[part2graph.at(idx)].emplace_back(idx);
+        }
+
+        if (subclasses.size() > 1) {
+            std::cout << "# Subclasses (" << name << ") " << subclasses.size() << ":\n";
+            // std::cout << "# ";
+            for (auto const& [part, idxs] : subclasses) {
+                // for (auto idx : idxs) {
+                //     std::cout << idx << " ";
+                // }
+                for (auto idx : idxs) {
+                    std::cout << "g" << idx << " = " << graph_list[idx] << "\n";
+                }
+                std::cout << "#-\n";
+            }
+            std::cout << "\n";
+        }
+    }
+}
+
 
 
 int main(int argc, char* argv[]) {
@@ -158,70 +194,35 @@ int main(int argc, char* argv[]) {
     };
 
 
-    {
-        auto start = std::chrono::steady_clock::now();
 
+
+    auto eq_parts_tree = [&](){
         auto rehash = wl::rehash_t{};
-        auto graph_list = get_graph_list();
-        std::cout << "read " << graph_list.size() << " graphs\n";
-
-        
-        auto colvecs = std::vector<wl::colvec_t>{};        
-        for (auto &&graph : graph_list) {
-            auto colvec = wl::colors_1(graph, rehash);
-            colvecs.emplace_back(std::move(colvec));
-        }
-
-        std::cout << "color classes " << unique_size(std::move(colvecs)) << " (colors_1) \n";
-
-        std::cout << "\ttime elapsed ";
-        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - start).count() << "ms\n\n";
-    }
+        return compute_equivalence("colors_1", get_graph_list, [&rehash](auto&& graph) {
+            return wl::colors_1(graph, rehash);
+        });
+    }();
 
 
-    {
-        auto start = std::chrono::steady_clock::now();
+    auto eq_parts_cat = compute_equivalence("colors_caterpillar", get_graph_list, [](auto&& graph) {
+        return wl::colors_caterpillar(graph);
+    });
+
+    auto eq_parts_path = compute_equivalence("colors_path", get_graph_list, [](auto&& graph) {
+        return wl::colors_path(graph);
+    });
 
 
-        auto graph_list = get_graph_list();
-        std::cout << "read " << graph_list.size() << " graphs\n";
 
-        auto colvecs = std::vector<std::vector<wl::trie<uint64_t>>>{};
-        for (auto&& graph : graph_list) {
-            auto colvec = wl::colors_caterpillar(graph);
-            colvecs.emplace_back(std::move(colvec));
-            // std::cout << "." << std::flush;
-        }
+    auto const part2graph_tree = partitions_to_map(eq_parts_tree);
+    auto const part2graph_cat = partitions_to_map(eq_parts_cat);
+    auto const part2graph_path = partitions_to_map(eq_parts_path);    
 
-        std::cout << "color classes " << unique_size(std::move(colvecs)) << " (colors_caterpillar) \n";
+    auto graph_list = get_graph_list();
 
-        std::cout << "\ttime elapsed ";
-        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - start).count() << "ms\n\n";
-    }
+    print_subclasses("cat < tree", eq_parts_cat, part2graph_tree, graph_list);
+    print_subclasses("path < cat", eq_parts_path, part2graph_cat, graph_list);
 
-
-    {
-        auto start = std::chrono::steady_clock::now();
-
-
-        auto graph_list = get_graph_list();
-        std::cout << "read " << graph_list.size() << " graphs\n";
-
-        auto colvecs = std::vector<std::vector<wl::poly_t>>{};
-        for (auto&& graph : graph_list) {
-            auto colvec = wl::colors_path(graph);
-            colvecs.emplace_back(std::move(colvec));
-            // std::cout << "." << std::flush;
-        }
-
-        std::cout << "color classes " << unique_size(std::move(colvecs)) << " (colors_path) \n";
-
-        std::cout << "\ttime elapsed ";
-        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - start).count() << "ms\n\n";
-    }
 
 
     return 0;

@@ -398,15 +398,13 @@ namespace impl {
     auto partition(T const& sorted_vec) -> std::vector<size_t> {
         auto result = std::vector<size_t>{};
 
-        int last_repr = 0;
-        for (size_t i=1; i < sorted_vec.size(); ++i) {
-            if (sorted_vec[i] != sorted_vec[last_repr]) {
-                result.emplace_back(i - last_repr);
-                last_repr = i;
+        for (size_t i=0; i < sorted_vec.size(); ++i) {
+            if (i == 0 || sorted_vec[i] != sorted_vec[i-1]) {
+                result.emplace_back(0);
             }
+            result.back() += 1;
         }
 
-        result.emplace_back(sorted_vec.size() - last_repr);
         return result;
     }
 

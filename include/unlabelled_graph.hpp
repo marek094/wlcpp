@@ -127,6 +127,21 @@ public:
         return degrees;
     }
 
+    // print edgelist
+    friend auto operator<<(std::ostream& os, Graph const& graph) -> std::ostream& {
+        os << "[";
+        bool is_first = true;
+        for (auto [u, v] : graph.edges) {
+            if (!is_first) {
+                os << ", ";
+            }
+            os << "(" << static_cast<int>(u) << ", " << static_cast<int>(v) << ")";
+            is_first = false;
+        }
+        os << "]";
+        return os;
+    }
+
     using type = vertex_t;
     std::vector<unsigned long long> labels;
     unsigned long long num_vertices;

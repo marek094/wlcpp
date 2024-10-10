@@ -207,12 +207,14 @@ TEST_F(TrieTest, IncTestEmpty) {
 }
 
 
-// TEST_F(TrieTest, Hash) {
+TEST_F(TrieTest, Hash) {
 
-//     trie_.insert({2, 1, 0, 0});
-//     trie_.insert({2, 1, 1, 0});
+    trie_.inc();
+    trie_.inc();
+    trie_.inc();
 
-// }
+    
+}
 
 
 
