@@ -68,7 +68,7 @@ auto partitions_to_map(std::vector<std::vector<size_t>> const& partitions) {
 
 
 template<typename GetGraphs, typename GetColors>
-auto compute_equivalence(std::string name, GetGraphs&& get_graphs, GetColors&& get_colors) {
+auto compute_equivalence(std::string name, GetGraphs&& get_graphs, int threads, GetColors&& get_colors) {
     
     auto start = std::chrono::steady_clock::now();
 
@@ -78,10 +78,13 @@ auto compute_equivalence(std::string name, GetGraphs&& get_graphs, GetColors&& g
     
     using return_t = decltype(get_colors(graph_list[0]));
     auto colvecs = std::vector<data_with_index<return_t>>{};
+    colvecs.resize(graph_list.size());
+
+    #pragma omp parallel for num_threads(threads)
     for (size_t i = 0; i < graph_list.size(); ++i) {
         auto colvec = get_colors(graph_list[i]);
         std::sort(colvec.begin(), colvec.end());
-        colvecs.emplace_back(std::move(colvec), i);
+        colvecs[i] = {colvec, i};
     }
 
     std::cout << "color classes " << unique_size(colvecs) << " (" << name << ") \n";
@@ -199,17 +202,17 @@ int main(int argc, char* argv[]) {
 
     auto eq_parts_tree = [&](){
         auto rehash = wl::rehash_t{};
-        return compute_equivalence("colors_1", get_graph_list, [&rehash](auto&& graph) {
+        return compute_equivalence("colors_1", get_graph_list, 1, [&rehash](auto&& graph) {
             return wl::colors_1(graph, rehash);
         });
     }();
 
 
-    auto eq_parts_cat = compute_equivalence("colors_caterpillar", get_graph_list, [](auto&& graph) {
+    auto eq_parts_cat = compute_equivalence("colors_caterpillar", get_graph_list, threads, [](auto&& graph) {
         return wl::colors_caterpillar(graph);
     });
 
-    auto eq_parts_path = compute_equivalence("colors_path", get_graph_list, [](auto&& graph) {
+    auto eq_parts_path = compute_equivalence("colors_path", get_graph_list, threads, [](auto&& graph) {
         return wl::colors_path(graph);
     });
 
