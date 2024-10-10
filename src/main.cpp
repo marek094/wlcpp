@@ -82,9 +82,9 @@ auto compute_equivalence(std::string name, GetGraphs&& get_graphs, int threads, 
 
     #pragma omp parallel for num_threads(threads)
     for (size_t i = 0; i < graph_list.size(); ++i) {
-        auto colvec = get_colors(graph_list[i]);
+        colvecs[i].first = get_colors(graph_list[i]);
         std::sort(colvec.begin(), colvec.end());
-        colvecs[i] = {colvec, i};
+        colvecs[i].second = i;
     }
 
     std::cout << "color classes " << unique_size(colvecs) << " (" << name << ") \n";
