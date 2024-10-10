@@ -112,7 +112,7 @@ auto colors_1(SmallGraph const& graph, rehash_t& rehash, colvec_t const& labels 
         // std::cout << "" << stringyfy_vector(colvec2) << " \n";
 
         if (!is_refined(colvec, colvec2)) {
-            std::sort(colvec2.begin(), colvec2.end());
+            // std::sort(colvec2.begin(), colvec2.end());
             // std::cout << "t=" << t;
             return colvec2;
         }
@@ -441,49 +441,37 @@ auto is_refined(std::vector< T> vec1, std::vector< T> vec2) -> bool {
 
 
 auto colors_caterpillar(SmallGraph const& graph) -> std::vector<trie<uint64_t>> {
-
     auto n = graph.number_of_vertices();
 
     auto coltries = std::vector<trie<uint64_t>>(n);
-    auto coltries_sorted = coltries;
+    for (auto& p : coltries) p.inc();
     
     for (int t = 0;; ++t) {
-        auto coltries2 = std::vector<trie<uint64_t>>{};
-        coltries2.reserve(n);
+        // copy
+        auto coltries2 = coltries;
+        for (auto& p : coltries) p.inc();
 
         for (int i = 0; i < n; ++i) {
-            // original 
-            auto sum = coltries[i];
-
             if (i < graph.adj_list.size()) {
                 for (int j : graph.adj_list[i]) {
-                    auto trie_inc = coltries[j];
-                    trie_inc.inc();
-                    sum.merge(trie_inc);
+                    coltries2[i].merge(coltries[j]);
                 }
             }
-
-            coltries2.emplace_back(std::move(sum));
         }
 
-        // copy
-        coltries = coltries2;
-        
-        // coltries2_sorted
-        std::sort(coltries2.begin(), coltries2.end());
 
-        if (!is_refined_sorted(coltries_sorted, coltries2)) {
+        if (!is_refined(coltries, coltries2)) {
             return coltries2;
         }
 
-        coltries_sorted = std::move(coltries2);
+        coltries = std::move(coltries2);
     }
 
     return {};
 };
 
 
-// using poly_t = std::map<uint64_t, uint64_t>;
+
 class poly_t {
 
 public:
@@ -522,43 +510,30 @@ public:
 
 
 auto colors_path(SmallGraph const& graph) -> std::vector<poly_t> {
-
     auto n = graph.number_of_vertices();
 
     auto colpolys = std::vector<poly_t>(n);
-    for (auto& t : colpolys) t.inc();
-    auto coltries_sorted = colpolys;
+    for (auto& p : colpolys) p.inc();
     
     for (int t = 0;; ++t) {
-        auto colpolys2 = std::vector<poly_t>{};
-        colpolys2.reserve(n);
+        // copy
+        auto colpolys2 = colpolys;
+        for (auto& p : colpolys) p.inc();
 
         for (int i = 0; i < n; ++i) {
-            // original 
-            auto sum = colpolys[i];
-
             if (i < graph.adj_list.size()) {
                 for (int j : graph.adj_list[i]) {
-                    auto trie_inc = colpolys[j];
-                    trie_inc.inc();
-                    sum.merge(trie_inc);
+                    colpolys2[i].merge(colpolys[j]);
                 }
             }
-
-            colpolys2.emplace_back(std::move(sum));
         }
 
-        // copy
-        colpolys = colpolys2;
-        
-        // coltries2_sorted
-        std::sort(colpolys2.begin(), colpolys2.end());
 
-        if (!is_refined_sorted(coltries_sorted, colpolys2)) {
+        if (!is_refined(colpolys, colpolys2)) {
             return colpolys2;
         }
 
-        coltries_sorted = std::move(colpolys2);
+        colpolys = std::move(colpolys2);
     }
 
     return {};

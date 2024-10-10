@@ -80,6 +80,7 @@ auto compute_equivalence(std::string name, GetGraphs&& get_graphs, GetColors&& g
     auto colvecs = std::vector<data_with_index<return_t>>{};
     for (size_t i = 0; i < graph_list.size(); ++i) {
         auto colvec = get_colors(graph_list[i]);
+        std::sort(colvec.begin(), colvec.end());
         colvecs.emplace_back(std::move(colvec), i);
     }
 
