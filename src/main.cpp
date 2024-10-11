@@ -80,7 +80,7 @@ auto compute_equivalence(std::string name, GetGraphs&& get_graphs, int threads, 
     auto colvecs = std::vector<data_with_index<return_t>>{};
     colvecs.resize(graph_list.size());
 
-    #pragma omp parallel for num_threads(threads)
+    #pragma omp parallel for if (threads > 1)
     for (size_t i = 0; i < graph_list.size(); ++i) {
         colvecs[i].index = i;
         colvecs[i].data = get_colors(graph_list[i]);
@@ -150,7 +150,8 @@ int main(int argc, char* argv[]) {
     
     size_t threads = 1;
     if (argc >= 3) {
-        omp_set_num_threads(std::atoi(argv[2]));
+        threads = std::atoi(argv[2]);
+        omp_set_num_threads(threads);
     }
     
     size_t limit = -1;
@@ -198,6 +199,7 @@ int main(int argc, char* argv[]) {
     };
 
 
+    std::cout << "threads: " << threads << "\n";
 
 
     auto eq_parts_tree = [&](){
