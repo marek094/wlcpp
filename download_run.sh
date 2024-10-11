@@ -1,7 +1,7 @@
 #!/bin/bash 
 
 # Download the data
-git clone -b feature/wlcpp https://github.com/marek094/wlcpp.git
+git clone -b feature/pathwl https://github.com/marek094/wlcpp.git
 
 # Run the program
 
