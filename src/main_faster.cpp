@@ -251,7 +251,7 @@ int main(int argc, char* argv[]) {
                 return result;
             };            
             auto rehash = wl::rehash_t{};
-            auto eq_parts_tree = compute_equivalence("colors_1", get_graph_list, 1, [&rehash](auto&& graph) {
+            auto eq_parts_tree = compute_equivalence("colors_1", subglgen2, 1, [&rehash](auto&& graph) {
                 return wl::colors_1(graph, rehash);
             }, true);
 
