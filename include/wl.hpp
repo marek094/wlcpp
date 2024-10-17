@@ -489,34 +489,60 @@ public:
     poly_t() : data{} {}
 
     auto merge(poly_t const& other) -> void {
-        for (auto&& [key, val] : other.data) {
-            data[key] += val;
+        // for (auto&& [key, val] : other.data) {
+        //     data[key] += val;
+        // }
+        if (data.size() < other.data.size()) {
+            data.resize(other.data.size(), 0);
+        }
+
+        for (size_t i = 0; i < other.data.size(); ++i) {
+            data[i] += other.data[i];
         }
     }
 
     auto inc() -> void {
+        // if (data.empty()) {
+        //     data[0] = 1;
+        //     return;
+        // }
+
+        // auto upd_data = std::map<uint64_t, uint64_t>{};
+        // for (auto&& [key, val] : data) {
+        //     upd_data[key + 1] = val;
+        // }
+
+        // data = std::move(upd_data);
         if (data.empty()) {
-            data[0] = 1;
+            data.push_back(1);
             return;
         }
-
-        auto upd_data = std::map<uint64_t, uint64_t>{};
-        for (auto&& [key, val] : data) {
-            upd_data[key + 1] = val;
-        }
-
-        data = std::move(upd_data);
+        data.insert(data.begin(), 0);
     }
 
     auto operator<=>(poly_t const& other) const {
-        return data <=> other.data;
+        // return data <=> other.data;
+        for (size_t i = 0; i < std::min(data.size(), other.data.size()); ++i) {
+            if (data[i] != other.data[i]) {
+                return data[i] <=> other.data[i];
+            }
+        }
+
+        if (data.size() < other.data.size()) {
+            return std::strong_ordering::less;
+        } else if (data.size() > other.data.size()) {
+            return std::strong_ordering::greater;
+        } else {
+            return std::strong_ordering::equal;
+        }
     }
 
     auto operator==(poly_t const& other) const -> bool {
         return data == other.data;
     }
 
-    std::map<uint64_t, uint64_t> data;
+    // std::map<uint64_t, uint64_t> data;
+    std::vector<uint64_t> data;
 };
 
 
