@@ -285,7 +285,7 @@ int main(int argc, char* argv[]) {
     }
 
 
-
+    std::cout << "done.\n";
 
     // auto const part2graph_tree = partitions_to_map(eq_parts_tree);
     // auto const part2graph_cat = partitions_to_map(eq_parts_cat);
