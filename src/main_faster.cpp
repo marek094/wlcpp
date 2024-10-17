@@ -75,7 +75,7 @@ auto compute_equivalence(std::string name, GetGraphs&& get_graphs, int threads, 
     auto graph_list = get_graphs();
 
     if (!quiet) {
-        std::cout << "read " << graph_list.size() << " graphs\n";
+        std::cerr << "read " << graph_list.size() << " graphs\n";
     }
     
     using return_t = decltype(get_colors(graph_list[0]));
@@ -90,10 +90,10 @@ auto compute_equivalence(std::string name, GetGraphs&& get_graphs, int threads, 
     }
 
     if (!quiet) {
-        std::cout << "color classes " << unique_size(colvecs) << " (" << name << ") \n";
+        std::cerr << "color classes " << unique_size(colvecs) << " (" << name << ") \n";
 
-        std::cout << "\ttime elapsed ";
-        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::cerr << "\ttime elapsed ";
+        std::cerr << std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - start).count() << "ms\n\n";
     }
     
@@ -285,7 +285,7 @@ int main(int argc, char* argv[]) {
     }
 
 
-    std::cout << "done.\n";
+    std::cerr << "done.\n";
 
     // auto const part2graph_tree = partitions_to_map(eq_parts_tree);
     // auto const part2graph_cat = partitions_to_map(eq_parts_cat);
