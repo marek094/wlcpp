@@ -23,6 +23,7 @@ auto stringyfy_vector(std::vector<T> const& vec) -> std::string {
     return std::move(ss).str();
 }
 
+
 auto relabel(std::string const& col, rehash_t& rehash) -> int {
     if (rehash.find(col) == rehash.end()) {
         rehash[col] = rehash.size();
@@ -30,7 +31,18 @@ auto relabel(std::string const& col, rehash_t& rehash) -> int {
     return rehash[col];
 }
 
-auto relabel(colvec_t const& col, rehash_t& rehash) -> int {
+
+auto relabel(std::string const& col, rehash_t const& rehash) -> int {
+    if (auto it = rehash.find(col); it != rehash.end()) {
+        return it->second;
+    }
+    throw std::runtime_error("rehash not found");
+    return -1;
+}
+
+
+template <typename RehashT>
+auto relabel(colvec_t const& col, RehashT& rehash) -> int {
     return relabel(stringyfy_vector(col), rehash);
 }
 
@@ -85,8 +97,8 @@ auto is_refined(std::vector<colvec_t> const& vec2d1, std::vector<colvec_t> const
 }
 
 
-
-auto colors_1(SmallGraph const& graph, rehash_t& rehash, colvec_t const& labels = {}) -> colvec_t {
+template <typename RehashT>
+auto colors_1(SmallGraph const& graph, RehashT&& rehash, colvec_t const& labels = {}) -> colvec_t {
     auto A = graph.to_adjacency_matrix();
     auto n = A.rows();
     
@@ -121,7 +133,6 @@ auto colors_1(SmallGraph const& graph, rehash_t& rehash, colvec_t const& labels 
 
     return {};
 }
-
 
 
 auto colors_p1_03(SmallGraph const& graph, rehash_t& rehash, colvec_t const& labels = {}) -> colvec_t {

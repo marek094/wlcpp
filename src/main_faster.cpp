@@ -239,6 +239,17 @@ int main(int argc, char* argv[]) {
             return wl::colors_caterpillar(graph);
         }, true);
 
+        auto rehash = wl::rehash_t{};
+        {
+            // speedup (?)
+            auto eq_parts_tree = compute_equivalence("colors_1", subglgen, 1, [&rehash](auto&& graph) {
+                return wl::colors_1(graph, rehash);
+            }, true);
+
+            if (eq_parts_tree.size() <= 1) continue;
+        }
+        auto const& crehash = rehash;
+
 
         #pragma omp parallel for if (threads > 1)
         for (auto const& part2 : eq_parts_cat) {
@@ -254,9 +265,8 @@ int main(int argc, char* argv[]) {
                 return graph_list2;
             };
 
-            auto rehash = wl::rehash_t{};
-            auto eq_parts_tree = compute_equivalence("colors_1", subglgen2, 1, [&rehash](auto&& graph) {
-                return wl::colors_1(graph, rehash);
+            auto eq_parts_tree = compute_equivalence("colors_1", subglgen2, 1, [&crehash](auto&& graph) {
+                return wl::colors_1(graph, crehash);
             }, true);
 
             if (eq_parts_tree.size() <= 1) continue;
