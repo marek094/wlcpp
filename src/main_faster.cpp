@@ -244,13 +244,16 @@ int main(int argc, char* argv[]) {
         for (auto const& part2 : eq_parts_cat) {
             if (part2.size() <= 1) continue;
 
-            auto subglgen2 = [&]() { 
-                auto result = std::vector<wl::SmallGraph>{};
-                for (auto idx : part2) {
-                    result.emplace_back(graph_list[part[idx]]);
-                }
-                return result;
-            };            
+
+            graph_list2 = std::vector<wl::SmallGraph>{};
+            for (auto idx : part2) {
+                graph_list2.emplace_back(graph_list[part[idx]]);
+            }
+
+            auto subglgen2 = [&]() {
+                return graph_list2;
+            };
+
             auto rehash = wl::rehash_t{};
             auto eq_parts_tree = compute_equivalence("colors_1", subglgen2, 1, [&rehash](auto&& graph) {
                 return wl::colors_1(graph, rehash);
@@ -267,7 +270,7 @@ int main(int argc, char* argv[]) {
 
             auto const part2graph_tree = partitions_to_map(eq_parts_tree);  
 
-            print_subclasses("cat < tree", eq_parts_cat, part2graph_tree, graph_list);
+            print_subclasses("cat < tree", eq_parts_cat, part2graph_tree, graph_list2);
         }
     }
 
