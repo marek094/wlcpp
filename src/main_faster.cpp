@@ -245,7 +245,7 @@ int main(int argc, char* argv[]) {
             if (part2.size() <= 1) continue;
 
 
-            graph_list2 = std::vector<wl::SmallGraph>{};
+            auto graph_list2 = std::vector<wl::SmallGraph>{};
             for (auto idx : part2) {
                 graph_list2.emplace_back(graph_list[part[idx]]);
             }
