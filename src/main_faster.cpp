@@ -240,6 +240,7 @@ int main(int argc, char* argv[]) {
         }, true);
 
 
+        #pragma omp parallel for if (threads > 1)
         for (auto const& part2 : eq_parts_cat) {
             if (part2.size() <= 1) continue;
 
